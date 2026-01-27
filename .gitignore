@@ -1,0 +1,5 @@
+__pycache__/
+.trae
+logs
+models
+log.md
