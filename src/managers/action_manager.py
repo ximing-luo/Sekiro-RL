@@ -1,5 +1,5 @@
 import threading
-from src.envs.tasks.sekiro.action_map import get_action_callable, action_count, assert_config_consistency
+from src.envs.mdp.actions import get_action_callable, action_count, assert_config_consistency
 
 class ActionManager:
     """

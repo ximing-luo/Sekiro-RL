@@ -23,8 +23,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import configs.config as config
-from src.envs.tasks.sekiro.action_map import ACTION_LABELS
-from src.envs.tasks.sekiro.action_map import ACTION_FUNC_MAP, action_count, no_op_index
+from src.envs.mdp.actions import ACTION_LABELS
+from src.envs.mdp.actions import ACTION_FUNC_MAP, action_count, no_op_index
 try:
     from streamlit_autorefresh import st_autorefresh
     _HAS_AR = True

@@ -1,4 +1,4 @@
-from src.envs.tasks.sekiro.rewards import design_event_rewards
+from src.envs.mdp.rewards import design_event_rewards
 
 class RewardManager:
     """

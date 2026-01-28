@@ -1,3 +1,5 @@
+from src.envs.mdp.terminations import check_simple_termination
+
 class TerminationManager:
     """
     终止管理器：负责判断回合是否结束。
@@ -10,8 +12,8 @@ class TerminationManager:
         """判断是否达到终止条件（如死亡、胜利）。"""
         done = 0
         
-        # 如果发生了事件 0 (自身死亡) 或 1 (Boss 死亡)
-        if 0 in events or 1 in events:
+        # 使用 MDP 中的判定逻辑
+        if check_simple_termination(events):
             if self.emergence_break < 1:
                 done = 1
                 self.emergence_break += 1

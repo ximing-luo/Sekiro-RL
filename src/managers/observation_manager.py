@@ -1,4 +1,4 @@
-from src.envs.tasks.sekiro.metrics import extract_metrics_from_memory
+from src.envs.mdp.observations import extract_metrics_from_memory
 import configs.config as config
 
 class ObservationManager:

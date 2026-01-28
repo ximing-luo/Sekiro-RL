@@ -1,14 +1,7 @@
 """
 模块用途：奖励与事件的规则化计算。
-
-包含：
-- 函数：calculate_loss_reward(action_id), compute_reward(...)
-
-边界：
-- 负责：将状态变化映射为奖励值与事件列表
-- 不负责：阈值机制、采集与训练循环
 """
-    
+
 def design_event_rewards(
     boss_blood, next_boss_blood, self_blood, next_self_blood,
     boss_stamina, next_boss_stamina, self_stamina, next_self_stamina,

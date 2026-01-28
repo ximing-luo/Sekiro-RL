@@ -84,5 +84,3 @@ class SceneManager:
     def stop(self):
         """停止所有资源。"""
         self.stop_debug_visualization()
-        # 注意：FrameCapture 目前可能没有显示的 stop 方法，
-        # 如果有的话应该在这里调用。

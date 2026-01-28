@@ -16,16 +16,26 @@ import csv
 import json
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
-from src.envs.tasks.sekiro.env import Sekiro
+from src.tasks.sekiro.env import Sekiro
+from src.tasks.sekiro.sekiro_env_cfg import SekiroEnvCfg
 from src.policies.dqn_agent import DQNAgent
-from src.envs.tasks.sekiro.action_map import action_count
+from src.envs.mdp.actions import action_count
 from src.interfaces.system.input import key_check
 import src.interfaces.system.window as window_utils
 import configs.config as config
 
 def _init_env_agent(pos, img_width, img_height, action_dim, model_path, n_step_rewards):
     ad = action_dim if action_dim is not None else int(action_count())
-    env = Sekiro(observation_w=img_width, observation_h=img_height, action_dim=ad, pos=pos, debug_vis_fps=60, n_step_rewards=n_step_rewards)
+    
+    # 使用新的配置驱动初始化
+    cfg = SekiroEnvCfg()
+    cfg.scene.pos = pos
+    cfg.scene.observation_w = img_width
+    cfg.scene.observation_h = img_height
+    cfg.scene.debug_vis_fps = 60
+    cfg.n_step_rewards = n_step_rewards
+    
+    env = Sekiro(cfg=cfg)
     agent = DQNAgent(img_width, img_height, ad, buffer=env.replay_buffer, model_file=model_path, n_step_rewards=n_step_rewards)
     if os.path.isfile(model_path):
         try:

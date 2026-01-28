@@ -1,22 +1,6 @@
 """
 模块用途：提供动作索引到可调用函数的映射与展示标签。
-
-包含：
-- 常量：ACTION_FUNC_MAP, ACTION_LABELS, ACTION_DIM
-- 函数：get_action_callable(index), action_count(), assert_config_consistency(expected_dim=None)
-
-边界：
-- 负责：将离散动作编号映射到执行函数
-- 不负责：具体动作实现、环境状态管理、训练逻辑
 """
-import os
-import sys
-
-# 将项目根目录添加到 sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from src.interfaces.controls import sekiro_ops as _actions
 
 # 动作索引到可调用函数的映射
