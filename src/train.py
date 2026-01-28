@@ -16,9 +16,9 @@ import csv
 import json
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
-from src.envs.sekiro.env import Sekiro
+from src.envs.tasks.sekiro.env import Sekiro
 from src.policies.dqn_agent import DQNAgent, _np_to_torch_imgs
-from src.envs.sekiro.action_map import action_count
+from src.envs.tasks.sekiro.action_map import action_count
 from src.interfaces.system.input import key_check
 from src.visualization.logger import write_json, write_csv
 import src.interfaces.system.window as window_utils

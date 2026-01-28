@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import contextlib
 from src.models.simple_dqn import dqn_simple
 from src.models.resnet import ddqn_res18
-from src.envs.sekiro.action_map import no_op_index
+from src.envs.tasks.sekiro.action_map import no_op_index
 import configs.config as config
 
 # 设备选择：优先使用 CUDA
@@ -119,7 +119,6 @@ class DQNAgent:
         # 运行元数据与缓存
         self.run_id = time.strftime('%Y%m%d-%H%M%S')  # 本次训练运行唯一标识（用于日志命名）
         self._last_q = None  # 最近一次前向计算的原始 Q 值缓存
-        self._last_q_mod = None  # 最近一次“欲望”加权后的 Q 值缓存
 
     def _load_pretrained_backbone(self, model_path, current_in_channels):
         """加载预训练 ResNet 权重，适配多通道输入，并冻结主干层。"""
@@ -208,7 +207,6 @@ class DQNAgent:
                 action = torch.argmax(q_values).item()
                 try:
                     self._last_q = q_values[0].detach().cpu().numpy()
-                    self._last_q_mod = self._last_q  # 不再使用修改后的 Q 值，直接使用原始 Q 值
                 except Exception:
                     pass
             finally:

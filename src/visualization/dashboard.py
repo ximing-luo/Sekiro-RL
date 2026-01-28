@@ -23,8 +23,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import configs.config as config
-from src.envs.sekiro.action_map import ACTION_LABELS
-from src.envs.sekiro.action_map import ACTION_FUNC_MAP, action_count, no_op_index
+from src.envs.tasks.sekiro.action_map import ACTION_LABELS
+from src.envs.tasks.sekiro.action_map import ACTION_FUNC_MAP, action_count, no_op_index
 try:
     from streamlit_autorefresh import st_autorefresh
     _HAS_AR = True
@@ -140,12 +140,8 @@ else:
     action = data.get('action', 0)
     events_feedback = data.get('events_feedback', [])
     events_list = data.get('events', [])
-    # adj_reward = data.get('adj_reward', 0.0) # Removed
     raw_reward = data.get('raw_reward', None)
     q_values = data.get('q_values', [])
-    # q_values_mod = data.get('q_values_mod', []) # Removed
-    # desire_thresholds = data.get('desire_thresholds', []) # Removed
-    # reward_thr_action = data.get('reward_thresholds_action', []) # Removed
     action_recent_counts = data.get('action_recent_counts', [])
     adv_values = data.get('adv_values', [])
     adv_values_shrink = data.get('adv_values_shrink', [])
@@ -155,21 +151,10 @@ else:
 
     try:
         q_values = [float(x) for x in q_values]
-        # desire_thresholds = [float(x) for x in desire_thresholds]
-        # q_values_mod = [float(x) for x in q_values_mod]
     except Exception:
         q_values = list(q_values)
-        # desire_thresholds = list(desire_thresholds)
-        # q_values_mod = list(q_values_mod)
 
     n_q = len(q_values)
-    # n_mod = len(q_values_mod)
-    # if n_mod > 0 and n_q > 0:
-    #     n_common = min(n_q, n_mod)
-    #     q_values = q_values[:n_common]
-    #     q_values_mod = q_values_mod[:n_common]
-    # else:
-    #     pass
 
     if view_mode == '当前步':
         mcols = st.columns(6)
