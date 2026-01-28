@@ -11,12 +11,20 @@
 """
 import json
 import os
+import sys
 import time
 import streamlit as st
 import pandas as pd
 import altair as alt
-from date.actions_map import ACTION_LABELS
-from date.actions_map import ACTION_FUNC_MAP, action_count, no_op_index
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import configs.config as config
+from src.envs.sekiro.action_map import ACTION_LABELS
+from src.envs.sekiro.action_map import ACTION_FUNC_MAP, action_count, no_op_index
 try:
     from streamlit_autorefresh import st_autorefresh
     _HAS_AR = True
@@ -26,7 +34,7 @@ except Exception:
 # 动作短标签来源：date/actions_map.py
 EVENT_LABELS = ['自身死亡','Boss死亡','自身掉血','自身回血','自身血量过低','Boss掉血','自身架势上升','Boss架势上升','Boss架势过低']
 
-LOG_DIR = os.path.join(os.path.dirname(__file__), 'model_gpu')
+LOG_DIR = config.LOG_DIR
 JSON_PATH = os.path.join(LOG_DIR, 'latest.json')
 CSV_PATH = os.path.join(LOG_DIR, 'train_metrics.csv')
 

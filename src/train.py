@@ -1,5 +1,12 @@
 import os
+import sys
 import time
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import threading
 from collections import deque
 import numpy as np
@@ -9,13 +16,13 @@ import csv
 import json
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
-from env import Sekiro
-from DQN import DQNAgent, _np_to_torch_imgs
-from date.actions_map import action_count
-from utils.getkeys import key_check
-from date.visualization import write_json, write_csv
-import utils.window_utils as window_utils
-import config
+from src.envs.sekiro.env import Sekiro
+from src.policies.dqn_agent import DQNAgent, _np_to_torch_imgs
+from src.envs.sekiro.action_map import action_count
+from src.interfaces.system.input import key_check
+from src.visualization.logger import write_json, write_csv
+import src.interfaces.system.window as window_utils
+import configs.config as config
 
 def _init_env_agent(pos, img_width, img_height, action_dim, model_path, n_step_rewards):
     ad = action_dim if action_dim is not None else int(action_count())
@@ -147,7 +154,7 @@ def _select_action_and_store(env: Sekiro, agent: DQNAgent, step: int, save_inter
 
 # （streamlit）记录训练指标（奖励、动作、事件索引、反馈、调整后的奖励）
 def _log_metrics(agent: DQNAgent, env: Sekiro, step, episode, action, events_feedback, reward, recent_rewards_deque, fps=None, epsilon=None):
-    log_dir = os.path.dirname(agent.model_file) or '.'
+    log_dir = config.LOG_DIR
     
     # 移除了所有阈值相关的记录
     des_row = [] # 阈值已移除
@@ -264,11 +271,15 @@ def train_agent(
     # 初始化环境与代理模型
     env, agent = _init_env_agent(pos, img_width, img_height, action_dim, model_path, n_step_rewards)
     
+    # 确保目录存在
+    os.makedirs(config.LOG_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(config.MODEL_PATH), exist_ok=True)
+    
     # 注册 TensorBoard Hook
-    writer = SummaryWriter(log_dir=os.path.dirname(agent.model_file) or '.')
+    writer = SummaryWriter(log_dir=config.LOG_DIR)
     _register_tensorboard_hooks(agent, writer)
     
-    log_dir = os.path.dirname(agent.model_file) or '.'
+    log_dir = config.LOG_DIR
     last_step, last_episode = _load_last_training_counters(log_dir)
     global_step = int(last_step)
     env.pause_game(True) # 暂停，可以慢慢把游戏画面调好
@@ -430,7 +441,7 @@ def run_agent(
 
 
 if __name__ == "__main__":
-    # train_agent()
-    run_agent() # 默认改为运行推理模式，或者让用户自己选择
+    train_agent()
+    # run_agent() # 默认改为运行推理模式，或者让用户自己选择
     time.sleep(1.0)
     window_utils.move_window("Sekiro", "center")

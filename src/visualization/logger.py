@@ -10,7 +10,13 @@
 - 不负责：训练逻辑、环境交互与模型管理
 """
 import os
-import os
+import sys
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import csv
 import json
 import time as _time
@@ -18,7 +24,7 @@ import time
 import threading
 import numpy as np
 import cv2
-from utils import window_utils
+from src.interfaces.system import window as window_utils
 try:
     import matplotlib
     matplotlib.use('Agg')

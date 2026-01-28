@@ -140,22 +140,22 @@ def boss_stamina_count(boss_bgr):
     boss_stamina = torch.sum(mask.all(dim=-1)).item()
     return boss_stamina
 
-def process_observation(width, height):
-    '''
-    处理观察到的图像，将其转换为模型输入的格式
-    Args:
-        width: 图像宽度
-        height: 图像高度
-    Returns:
-        obs: 处理后的图像，形状为 (height, width, 3)
-    '''
-    # 抓取窗口图像（BGR），调整尺寸并转换为 RGB
-    obs_bgr = grabscreen.grab_window_screen('Sekiro')
-    obs_resize = cv2.resize(obs_bgr, (width, height))
-    obs_rgb = cv2.cvtColor(obs_resize, cv2.COLOR_BGR2RGB)
-    # 输出形状为 (height, width, 3)
-    obs = np.array(obs_rgb).reshape(-1, height, width, 3)[0]
-    return obs
+# def process_observation(width, height):
+#     '''
+#     处理观察到的图像，将其转换为模型输入的格式
+#     Args:
+#         width: 图像宽度
+#         height: 图像高度
+#     Returns:
+#         obs: 处理后的图像，形状为 (height, width, 3)
+#     '''
+#     # 抓取窗口图像（BGR），调整尺寸并转换为 RGB
+#     obs_bgr = grabscreen.grab_window_screen('Sekiro')
+#     obs_resize = cv2.resize(obs_bgr, (width, height))
+#     obs_rgb = cv2.cvtColor(obs_resize, cv2.COLOR_BGR2RGB)
+#     # 输出形状为 (height, width, 3)
+#     obs = np.array(obs_rgb).reshape(-1, height, width, 3)[0]
+#     return obs
 
 def crop_image(image, window_list):
     """

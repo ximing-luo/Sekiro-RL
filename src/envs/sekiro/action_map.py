@@ -9,7 +9,15 @@
 - 负责：将离散动作编号映射到执行函数
 - 不负责：具体动作实现、环境状态管理、训练逻辑
 """
-from date import actions as _actions
+import os
+import sys
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.interfaces.controls import sekiro_ops as _actions
 
 # 动作索引到可调用函数的映射
 ACTION_FUNC_MAP = {

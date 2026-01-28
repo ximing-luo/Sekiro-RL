@@ -2,4 +2,5 @@ __pycache__/
 .trae
 logs
 models
+tests
 log.md

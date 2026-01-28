@@ -11,15 +11,23 @@
 """
 import threading
 import time
-import date.image_process as image_process
-from date.replay_buffer import ReplayBuffer
-from date.capture import FrameCapture
-from date.reward import design_event_rewards
-from date.actions_map import get_action_callable, ACTION_LABELS, assert_config_consistency, action_count
-from date.metrics import extract_metrics
-from utils.getkeys import key_check
-from utils import window_utils
-import config
+import os
+import sys
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import src.interfaces.observe.processor as image_process
+from src.envs.common.replay_buffer import ReplayBuffer
+from src.interfaces.observe.capture import FrameCapture
+from src.envs.sekiro.rewards import design_event_rewards
+from src.envs.sekiro.action_map import get_action_callable, ACTION_LABELS, assert_config_consistency, action_count
+from src.envs.sekiro.metrics import extract_metrics, extract_metrics_from_memory
+from src.interfaces.system.input import key_check
+from src.interfaces.system import window as window_utils
+import configs.config as config
 
 
 class Sekiro(object):
@@ -105,10 +113,10 @@ class Sekiro(object):
 
         fps 含义：可视化刷新帧率（每秒显示帧数），用于控制窗口更新速度。
 
-        实现内容：实例化并启动 `date.visualization.InputVisRunner`，在线程中将
+        实现内容：实例化并启动 `visualization.logger.InputVisRunner`，在线程中将
         堆叠帧逐张转换为 HWC 图像后通过 OpenCV 窗口展示，窗口置顶并定位。
         '''
-        from date.visualization import InputVisRunner
+        from src.visualization.logger import InputVisRunner
         self._input_vis_runner = InputVisRunner(fps)
         self._input_vis_runner.start() # 启动调试可视化线程
     # 更新调试窗口输入序列（CHW 堆叠帧）
@@ -138,9 +146,6 @@ class Sekiro(object):
         window_utils.activate_window_by_title_contains("Sekiro")
         fn = get_action_callable(action)
         fn()
-    #反馈设计  
-    def _calculate_loss_reward(self, action_id):
-        return calculate_loss_reward(action_id)
         
     # 事件判别：根据前后状态与动作，判定发生的事件，结束标志与紧急中断计数
     def detect_events(
@@ -228,10 +233,8 @@ class Sekiro(object):
         threading.Thread(target=self.take_action, args=(action,), daemon=True).start()
 
         # 数据收集
-        observe = self._frame_capture.latest_frame
-        next_self_blood, next_boss_blood, next_self_stamina, next_boss_stamina = extract_metrics(
-            observe, self.blood_window, self.stamina_window
-        )
+        # observe = self._frame_capture.latest_frame # 图像仍需保留用于观测输入
+        next_self_blood, next_boss_blood, next_self_stamina, next_boss_stamina = extract_metrics_from_memory()
 
         # 根据环境反馈计算奖励
         reward, done, emergence_break, events, components = self.get_reward(
@@ -252,7 +255,7 @@ class Sekiro(object):
         self.boss_stamina = next_boss_stamina
         self.emergence_break = emergence_break
         
-        # 直接使用原始奖励，不再进行阈值调整
+        # 直接使用原始奖励，不再进行奖励调整
         adjusted_reward = float(reward)
 
         self.replay_buffer.store_effect(action, adjusted_reward, done)
@@ -278,11 +281,6 @@ class Sekiro(object):
                 print('pause game')
             time.sleep(1)  # 添加短暂延迟以防止单次按键多次触发
 
-        # if self.emergence_break == 100:
-        #     paused = True
-        #     self.emergence_break = 0
-        #     print('emergence break')
-
         if paused:
             print('paused')
             while paused:  # 循环直到游戏不再暂停
@@ -299,9 +297,8 @@ class Sekiro(object):
 
     #环境重置（初始化）
     def reset(self):
-        # 重新抓取原始窗口截图以更新血量/精力基线
-        observe = self._frame_capture.latest_frame
-        sb, bb, ss, bs = extract_metrics(observe, self.blood_window, self.stamina_window)
+        # 从内存获取最新状态
+        sb, bb, ss, bs = extract_metrics_from_memory()
         self.self_blood = sb
         self.boss_blood = bb
         self.self_stamina = ss
@@ -310,12 +307,3 @@ class Sekiro(object):
 if __name__ == '__main__':
     pos = 'offscreen'
     window_utils.move_window("Sekiro", pos) #offscreen，center
-
-
-
-    
-
-
-
-
-    

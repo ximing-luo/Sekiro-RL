@@ -13,14 +13,21 @@
 import time
 import threading
 import os
+import sys
 import torch
+
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import torch.nn as nn
 import torch.nn.functional as F
 import contextlib
-from backbone.dqn import dqn_simple
-from backbone.resnet import ddqn_res18
-from date.actions_map import no_op_index
-import config
+from src.models.simple_dqn import dqn_simple
+from src.models.resnet import ddqn_res18
+from src.envs.sekiro.action_map import no_op_index
+import configs.config as config
 
 # 设备选择：优先使用 CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -86,7 +93,7 @@ class DQNAgent:
         # 加载预训练模型（如果存在）并冻结主干
         # 注意：这里假设预训练模型是单通道输入，而当前模型可能是多通道（Frame Stack）
         # 我们会将单通道权重复制扩展到多通道
-        pretrained_path = r"d:\Axon\ANN\Sekiro-RL\model_gpu\resnet_model.pth"
+        pretrained_path = os.path.join(project_root, "models", "resnet_model.pth")
         if os.path.isfile(pretrained_path):
             self._load_pretrained_backbone(pretrained_path, in_channels)
 

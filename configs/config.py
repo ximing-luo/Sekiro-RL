@@ -20,7 +20,8 @@ CAMERA_HEIGHT = 1080  # 摄像头采集分辨率高度
 BLOOD_WINDOW = (110, 90, 625, 907)  # 血量区域裁剪窗口 (x1,y1,x2,y2)
 STAMINA_WINDOW = (586, 54, 750, 900)  # 架势条区域裁剪窗口 (x1,y1,x2,y2)
 DEBUG_VIS_FPS = 60  # 环境输入调试窗口显示帧率
-MODEL_PATH = "d:/Axon/ANN/Sekiro-RL/model_gpu/dqn_model.pth"  # 模型权重保存路径
+MODEL_PATH = "models/dqn_model.pth"  # 模型权重保存路径
+LOG_DIR = "logs"  # 训练日志保存路径
 
 # 训练超参数
 LR = 0.0001  # 学习率（Adam）

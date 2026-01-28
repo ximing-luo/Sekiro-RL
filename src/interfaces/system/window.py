@@ -42,7 +42,16 @@ def find_window_by_title_contains(title_part, strict=False):
                         fallback_title_len = len(tl)
         return True
 
-    win32gui.EnumWindows(callback, None)
+    try:
+        win32gui.EnumWindows(callback, None)
+    except Exception as e:
+        if "拒绝访问" in str(e) or "Access is denied" in str(e):
+            print("\n" + "!"*60)
+            print("错误：枚举窗口被拒绝访问。")
+            print("请尝试以【管理员身份】运行 IDE 或终端。")
+            print("!"*60 + "\n")
+        raise e
+
     if exact_hwnd:
         return exact_hwnd
     

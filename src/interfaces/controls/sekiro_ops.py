@@ -11,12 +11,13 @@
 import time
 import sys
 import os
-from utils.directkeys import *
 
-# Add the project root directory to the Python path
-# This allows us to import modules from the 'utils' directory directly.
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+# 将项目根目录添加到 sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.interfaces.controls.keyboard import *
 
 fps = 15
 t = 1/fps
