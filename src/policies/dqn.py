@@ -28,16 +28,27 @@ class DQN(BaseAgent):
         
         self.optimizer_lock = threading.Lock()
         self.last_loss = 0.0
+        self.optimize_count = 0
 
     def act(self, state, epsilon=0.0):
         if np.random.rand() < epsilon:
             return np.random.randint(self.action_dim)
         
-        # 统一处理 numpy 数组
+        # 统一处理 numpy 数组 (期望输入形状: [k, H, W, C])
         if isinstance(state, np.ndarray):
-            state_t = torch.from_numpy(state).float().unsqueeze(0).to(self.device) / 255.0
+            state_t = torch.from_numpy(state).float().to(self.device)
         else:
-            state_t = torch.FloatTensor(state).unsqueeze(0).to(self.device) / 255.0
+            state_t = torch.FloatTensor(state).to(self.device)
+        
+        # 转换形状: [k, H, W, C] -> [k, C, H, W] -> [1, k*C, H, W]
+        if state_t.ndim == 4:
+            k, H, W, C = state_t.shape
+            state_t = state_t.permute(0, 3, 1, 2).reshape(1, k*C, H, W)
+        else:
+            # 备选处理，以防输入已经是 [C_in, H, W]
+            state_t = state_t.unsqueeze(0)
+            
+        state_t = state_t / 255.0
             
         with torch.no_grad():
             q_values = self.eval_net(state_t)
@@ -54,7 +65,11 @@ class DQN(BaseAgent):
         elif not self.buffer.can_sample(batch_size):
             return
 
-        with self.optimizer_lock:
+        # 尝试获取锁，如果已经在优化中则跳过，避免线程积压
+        if not self.optimizer_lock.acquire(blocking=False):
+            return
+
+        try:
             # 采样
             if self.n_step_rewards > 1:
                 obs, act, rew, next_obs, done, steps_used, idxes, weights = self.buffer.sample_n_step_per(batch_size, self.n_step_rewards, self.gamma)
@@ -63,8 +78,17 @@ class DQN(BaseAgent):
                 obs, act, rew, next_obs, done, idxes, weights = self.buffer.sample_per(batch_size)
                 gamma_power = self.gamma
 
-            obs_t = torch.FloatTensor(obs).to(self.device) / 255.0
-            next_obs_t = torch.FloatTensor(next_obs).to(self.device) / 255.0
+            obs_t = torch.FloatTensor(obs).to(self.device)
+            next_obs_t = torch.FloatTensor(next_obs).to(self.device)
+            
+            # 形状转换: (B, k, H, W, C) -> (B, k, C, H, W) -> (B, k*C, H, W)
+            def process_batch(t):
+                B, k, H, W, C = t.shape
+                return t.permute(0, 1, 4, 2, 3).reshape(B, k*C, H, W) / 255.0
+
+            obs_t = process_batch(obs_t)
+            next_obs_t = process_batch(next_obs_t)
+            
             act_t = torch.LongTensor(act).to(self.device)
             rew_t = torch.FloatTensor(rew).to(self.device)
             done_t = torch.FloatTensor(done).to(self.device)
@@ -100,6 +124,8 @@ class DQN(BaseAgent):
                 self.target_net.load_state_dict(self.eval_net.state_dict())
             
             return self.last_loss
+        finally:
+            self.optimizer_lock.release()
 
     def save(self, path):
         torch.save(self.eval_net.state_dict(), path)

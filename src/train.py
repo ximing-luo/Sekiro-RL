@@ -17,17 +17,16 @@ import json
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
 from src.envs.tasks.sekiro.env import Sekiro
-from src.policies.dqn_agent import DQNAgent, _np_to_torch_imgs
+from src.policies.dqn_agent import DQNAgent
 from src.envs.tasks.sekiro.action_map import action_count
 from src.interfaces.system.input import key_check
-from src.visualization.logger import write_json, write_csv
 import src.interfaces.system.window as window_utils
 import configs.config as config
 
 def _init_env_agent(pos, img_width, img_height, action_dim, model_path, n_step_rewards):
     ad = action_dim if action_dim is not None else int(action_count())
     env = Sekiro(observation_w=img_width, observation_h=img_height, action_dim=ad, pos=pos, debug_vis_fps=60, n_step_rewards=n_step_rewards)
-    agent = DQNAgent(img_width, img_height, ad, model_file=model_path, n_step_rewards=n_step_rewards)
+    agent = DQNAgent(img_width, img_height, ad, buffer=env.replay_buffer, model_file=model_path, n_step_rewards=n_step_rewards)
     if os.path.isfile(model_path):
         try:
             agent.load_model()
@@ -73,7 +72,7 @@ def _register_tensorboard_hooks(agent: DQNAgent, writer: SummaryWriter):
                     print(f"Hook error for {name}: {e}")
         return hook
 
-    model = agent.eval_net
+    model = agent.algorithm.eval_net
     # 注册 Hook 到感兴趣的层
     # ResNet 结构通常有: conv1, conv2_x, conv3_x, conv4_x, conv5_x
     layers_to_hook = {
@@ -147,81 +146,14 @@ def _select_action_and_store(env: Sekiro, agent: DQNAgent, step: int, save_inter
     k = env.replay_buffer.frame_history_len  # 需要堆叠的历史帧数，用于构造状态
     stacked_np = env.replay_buffer.get_latest_observation(k)  # 从缓冲区取最近k帧并拼接为观测
     env.update_debug_visual_input(stacked_np)  # 更新调试可视化输入，便于观察模型状态
-    state_t = _np_to_torch_imgs(stacked_np[None, ...])  # 将numpy图像转换为torch张量并添加batch维
-    action = agent.select_action(state_t, epsilon=epsilon)  # 由代理根据当前状态选择动作（含探索策略）
+    # 直接传递 numpy 数组，代理内部会处理转换
+    action = agent.select_action(stacked_np, epsilon=epsilon)  # 由代理根据当前状态选择动作（含探索策略）
     env.replay_buffer.store_latest_observation(stacked_np)  # 将本次观测写入经验缓冲区供训练使用
     return action  # 返回本步选中的动作索引
 
-# （streamlit）记录训练指标（奖励、动作、事件索引、反馈、调整后的奖励）
-def _log_metrics(agent: DQNAgent, env: Sekiro, step, episode, action, events_feedback, reward, recent_rewards_deque, fps=None, epsilon=None):
-    log_dir = config.LOG_DIR
-    
-    # 移除了所有阈值相关的记录
-    des_row = [] # 阈值已移除
-    recent_counts = []
-    r_act = []
-    r_full = []
-    _img_f0 = None
-    _img_static = None
-    _img_dynamic = None
-    # 计算近窗奖励均值
-    try:
-        reward_avg_recent = (sum(recent_rewards_deque) / len(recent_rewards_deque)) if len(recent_rewards_deque) > 0 else None
-    except Exception:
-        reward_avg_recent = None
-
-    write_json(
-        log_dir,
-        agent.run_id,
-        step,
-        episode,
-        action,
-        events_feedback,
-        reward, # 使用原始奖励代替 adj_reward
-        agent._last_q,
-        agent._last_q_mod,
-        des_row,
-        r_act,
-        r_full,
-        fps=fps,
-        adv_values=None,
-        adv_values_shrink=None,
-        state_value=None,
-        events=getattr(env, 'last_events', None),
-        raw_reward=getattr(env, 'last_total_reward_raw', None),
-        noop_1s_count=getattr(env, 'last_noop_count_1s', None),
-        action_recent_counts=recent_counts,
-        reward_avg_recent=reward_avg_recent,
-        feat_input_b64=getattr(env, 'last_feat_input_b64', None),
-        feat_static_b64=getattr(env, 'last_feat_static_b64', None),
-        feat_dynamic_b64=getattr(env, 'last_feat_dynamic_b64', None),
-        f0_last_maps_b64=getattr(env, 'last_f0_last_maps_b64', None),
-        static_layers_b64=getattr(env, 'last_static_layers_b64', None),
-        dynamic_layers_b64=getattr(env, 'last_dynamic_layers_b64', None),
-        epsilon=epsilon # 传递 epsilon
-    )
-    write_csv(
-        log_dir,
-        agent.run_id,
-        step,
-        episode,
-        action,
-        events_feedback,
-        reward, # 使用原始奖励代替 adj_reward
-        agent._last_q,
-        agent._last_q_mod,
-        des_row,
-        [],
-        raw_reward=getattr(env, 'last_total_reward_raw', None),
-        adv_values=None,
-        adv_values_shrink=None,
-        state_value=None,
-        events=getattr(env, 'last_events', None),
-        noop_1s_count=getattr(env, 'last_noop_count_1s', None),
-        action_recent_counts=recent_counts,
-        reward_avg_recent=reward_avg_recent,
-        epsilon=epsilon
-    )
+# （streamlit）记录训练指标
+def _log_metrics(agent: DQNAgent, env: Sekiro, step, episode, action, reward, recent_rewards_deque, fps=None, epsilon=None):
+    env.log_manager.log_step(agent, env, step, episode, action, reward, recent_rewards_deque, fps, epsilon)
 
 def _maybe_optimize(agent, env, step):
     freq = getattr(config, 'OPTIMIZE_EVERY_STEPS', 1)
@@ -232,7 +164,7 @@ def _maybe_optimize(agent, env, step):
     if freq <= 0:
         freq = 1
     if step % freq == 0:
-        threading.Thread(target=agent.optimize, args=(env.replay_buffer,), daemon=True).start()
+        threading.Thread(target=agent.learn, daemon=True).start()
 
 def _maybe_print(step, recent_rewards, last_print_time):
     if time.time() - last_print_time > 1.0:
@@ -321,7 +253,7 @@ def train_agent(
             _dt = time.time() - _loop_start
             _fps = (1.0 / _dt) if _dt > 1e-6 else 0.0
             print(f"FPS={_fps:.2f} EPS={epsilon:.3f}")
-            _log_metrics(agent, env, global_step, episode, action, events_feedback, reward, recent_rewards, fps=_fps, epsilon=epsilon)
+            _log_metrics(agent, env, global_step, episode, action, reward, recent_rewards, fps=_fps, epsilon=epsilon)
             last_print_time = _maybe_print(global_step, recent_rewards, last_print_time)
 
             # 模型保存：按优化步计数定期保存模型
@@ -386,9 +318,9 @@ def run_agent(
     # 推理模式：不探索
     epsilon = 0.0
     
-    # 确保模型处于评估模式（如果有相关设置）
-    if hasattr(agent.eval_net, 'eval'):
-        agent.eval_net.eval()
+    # 确保模型处于评估模式
+    if hasattr(agent.algorithm.eval_net, 'eval'):
+        agent.algorithm.eval_net.eval()
 
     for _ in range(total_interaction_steps):
         # 帧数控制

@@ -10,8 +10,7 @@ class BaseAgent(ABC):
     def __init__(self, action_dim, device="cuda"):
         self.action_dim = action_dim
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
-        self.train_steps = 0
-        self.optimize_count = 0
+        # 移除可能引起冲突的属性初始化，由具体子类或算法类管理
 
     @abstractmethod
     def act(self, state, epsilon=0.0):

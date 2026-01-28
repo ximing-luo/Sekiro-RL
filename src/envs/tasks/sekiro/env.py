@@ -11,13 +11,14 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.utils.replay_buffer import ReplayBuffer
+from src.policies.buffers.replay_buffer import ReplayBuffer
 from src.envs.managers import (
     SceneManager,
     ActionManager,
     ObservationManager,
     RewardManager,
-    TerminationManager
+    TerminationManager,
+    LogManager
 )
 import configs.config as config
 
@@ -33,7 +34,13 @@ class Sekiro:
         self.n_step_rewards = int(max(1, n_step_rewards))
         
         # 1. 初始化回放缓冲 (共享资源)
-        self.replay_buffer = ReplayBuffer(size=50, frame_history_len=config.FRAME_HISTORY_LEN)
+        # 增加容量，50 帧太小了，改为配置中的容量或默认值
+        buffer_size = getattr(config, 'BUFFER_SIZE', 50000)
+        self.replay_buffer = ReplayBuffer(
+            size=buffer_size, 
+            frame_history_len=config.FRAME_HISTORY_LEN,
+            obs_shape=(3, observation_h, observation_w)
+        )
         
         # 2. 初始化各个管理器
         self.scene_manager = SceneManager(observation_w, observation_h, self.replay_buffer, pos, capture_fps)
@@ -41,6 +48,7 @@ class Sekiro:
         self.observation_manager = ObservationManager(self.replay_buffer)
         self.reward_manager = RewardManager()
         self.termination_manager = TerminationManager()
+        self.log_manager = LogManager()
         
         # 启动场景 (窗口、采集)
         self.scene_manager.setup()

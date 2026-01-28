@@ -36,13 +36,16 @@ class DQNAgent(BaseAgent):
         self.run_id = self.algorithm.optimize_count # 保持兼容性
 
     def act(self, state, epsilon=0.0):
+        # 如果 state 是包含 batch 维度的 tensor，需要处理
+        if isinstance(state, torch.Tensor):
+            if state.ndim == 4: # (B, C, H, W)
+                state = state.squeeze(0).cpu().numpy()
+            else:
+                state = state.cpu().numpy()
         return self.algorithm.act(state, epsilon)
 
     def select_action(self, state, epsilon=0.0):
         """兼容旧接口：根据状态选择动作。"""
-        # 如果 state 是 tensor，先转回 numpy (因为框架底层处理 numpy)
-        if isinstance(state, torch.Tensor):
-            state = state.squeeze(0).cpu().numpy()
         return self.act(state, epsilon)
 
     def record(self, state, action, reward, next_state, done):

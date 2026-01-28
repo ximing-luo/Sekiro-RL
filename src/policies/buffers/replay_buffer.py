@@ -10,26 +10,32 @@ class ReplayBuffer(BaseBuffer):
     2. 优先经验回放 (Prioritized Experience Replay)
     3. N-步奖励 (N-step Rewards)
     """
-    def __init__(self, capacity, frame_history_len=4, alpha=0.6, beta=0.4):
-        super().__init__(capacity)
+    def __init__(self, size, frame_history_len=4, obs_shape=None, alpha=0.6, beta=0.4):
+        super().__init__(size)
         self.frame_history_len = frame_history_len
+        self.obs_shape = obs_shape
         self.alpha = alpha
         self.beta = beta
         self.beta_increment_per_sampling = 0.001
         
         # 使用循环数组存储，提高效率
-        self.observations = [None] * capacity
-        self.actions = np.zeros(capacity, dtype=np.int32)
-        self.rewards = np.zeros(capacity, dtype=np.float32)
-        self.dones = np.zeros(capacity, dtype=np.bool_)
-        self.priorities = np.zeros(capacity, dtype=np.float32)
+        self.observations = [None] * size
+        self.actions = np.zeros(size, dtype=np.int32)
+        self.rewards = np.zeros(size, dtype=np.float32)
+        self.dones = np.zeros(size, dtype=np.bool_)
+        self.priorities = np.zeros(size, dtype=np.float32)
         
         self.pos = 0
         self.size = 0
+        self.capacity = size # 兼容基类属性
         self.max_priority = 1.0
 
         # 用于视频流同步的辅助变量 (保持与旧代码兼容)
         self.video_num_in_buffer = 0
+
+    def sample(self, batch_size: int):
+        """实现 BaseBuffer 的抽象方法。默认执行优先采样。"""
+        return self.sample_per(batch_size)
 
     def add(self, obs, action, reward, done):
         """添加一条经验。注意：obs 应该是单帧。"""
@@ -158,6 +164,8 @@ class ReplayBuffer(BaseBuffer):
         return np.stack(list(reversed(frames)), axis=0)
 
     def update_priorities(self, indices, td_errors):
+        # 确保 td_errors 是 numpy 数组且有一致的形状
+        td_errors = np.array(td_errors).flatten()
         for idx, error in zip(indices, td_errors):
             self.priorities[idx] = np.abs(error) + 1e-6
         self.max_priority = max(self.max_priority, np.max(np.abs(td_errors)))
