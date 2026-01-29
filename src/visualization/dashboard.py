@@ -38,8 +38,8 @@ LOG_DIR = config.LOG_DIR
 JSON_PATH = os.path.join(LOG_DIR, 'latest.json')
 CSV_PATH = os.path.join(LOG_DIR, 'train_metrics.csv')
 
-st.set_page_config(page_title='RL Thresholds Viewer', layout='wide')
-st.title('RL Thresholds Viewer')
+st.set_page_config(page_title='RL Metrics Viewer', layout='wide')
+st.title('RL Metrics Viewer')
 
 # 启动一致性检查
 _act_map_len = len(ACTION_FUNC_MAP)
@@ -95,17 +95,11 @@ def _ensure_axis_defaults():
             defaults = {
                 'y_min_current': -20.0,
                 'y_max_current': 20.0,
-                'y_min_event_current': 0.0,
-                'y_max_event_current': 2.0,
                 'y_min_history': -20.0,
                 'y_max_history': 20.0,
-                'y_min_event_history': 0.0,
-                'y_max_event_history': 2.0,
                 'current_cols': 3,
                 'current_chart_width': 450,
                 'current_chart_height': 560,
-                'event_chart_width': 380,
-                'event_chart_height': 560,
                 'label_mode': '数字',
                 'use_auto_bar_ratio': True,
                 'current_bar_fill_ratio': 0.66,
@@ -125,12 +119,8 @@ def _ensure_axis_defaults():
 _ensure_axis_defaults()
 y_min = st.session_state['y_min_current']
 y_max = st.session_state['y_max_current']
-event_y_min = st.session_state['y_min_event_current']
-event_y_max = st.session_state['y_max_event_current']
 hist_y_min = st.session_state['y_min_history']
 hist_y_max = st.session_state['y_max_history']
-event_hist_y_min = st.session_state['y_min_event_history']
-event_hist_y_max = st.session_state['y_max_event_history']
 
 data = load_latest()
 if not data:
@@ -138,7 +128,6 @@ if not data:
 else:
     step = data.get('step', 0)
     action = data.get('action', 0)
-    events_feedback = data.get('events_feedback', [])
     events_list = data.get('events', [])
     raw_reward = data.get('raw_reward', None)
     q_values = data.get('q_values', [])
@@ -277,10 +266,7 @@ else:
                     
                     # 推断动作与事件数量
                     last_q = parse_list(df['q_values'].iloc[-1])
-                    # last_des = parse_list(df['desire_thresholds'].iloc[-1])
-                    # last_ev = parse_list(df['reward_thresholds_action'].iloc[-1])
-                    num_actions = len(last_q) # max(len(last_q), len(last_des))
-                    # num_events = len(last_ev)
+                    num_actions = len(last_q)
                     
                     act_options = [f"{i} {ACTION_LABELS[i] if i < len(ACTION_LABELS) else ''}".strip() for i in range(num_actions)]
                     
@@ -379,55 +365,9 @@ else:
                         else:
                             ch_hist = None
                         
-                        # 创建事件阈值图表
-                        if len(cached_data['rows_ev']) > 0:
-                            df_ev_hist = pd.DataFrame(cached_data['rows_ev'])
-                            
-                            # 调试信息：显示数据样本
-                            if len(df_ev_hist) > 0:
-                                print(f"事件阈值数据样本: {df_ev_hist.head()}")
-                                print(f"事件标签: {df_ev_hist['event_label'].unique()}")
-                                print(f"步数范围: {df_ev_hist['step'].min()} - {df_ev_hist['step'].max()}")
-                                print(f"阈值范围: {df_ev_hist['RewardThreshold'].min()} - {df_ev_hist['RewardThreshold'].max()}")
-                            
-                            _mx_ev_hist = (df_ev_hist['RewardThreshold'].max() if len(df_ev_hist) > 0 else 0.0)
-                            _mn_ev_hist = (df_ev_hist['RewardThreshold'].min() if len(df_ev_hist) > 0 else 0.0)
-                            _dom_ev_hist = [event_hist_y_min, event_hist_y_max]
-                            if st.session_state.get('use_auto_line_ratio_hist', True):
-                                _fill_hist = float(st.session_state.get('history_line_fill_ratio', 0.66))
-                                _center_mode = st.session_state.get('center_mode_hist', '中点居中')
-                                if _center_mode == '零居中':
-                                    _M2 = (max(abs(_mx_ev_hist), abs(_mn_ev_hist)) / _fill_hist) if (_mx_ev_hist != 0 or _mn_ev_hist != 0) else 1.0
-                                    _dom_ev_hist = [-_M2, _M2]
-                                elif _center_mode == '中值居中':
-                                    _med2 = float(df_ev_hist['RewardThreshold'].median()) if len(df_ev_hist) > 0 else 0.0
-                                    _up2 = (_mx_ev_hist - _med2) / _fill_hist if _mx_ev_hist != _med2 else 1.0
-                                    _lo2 = (_med2 - _mn_ev_hist) / _fill_hist if _mn_ev_hist != _med2 else 1.0
-                                    _span2 = max(_up2, _lo2, 1.0)
-                                    _dom_ev_hist = [_med2 - _span2, _med2 + _span2]
-                                elif _center_mode == '中点居中':
-                                    _mid2 = (_mx_ev_hist + _mn_ev_hist) / 2.0
-                                    _up2 = (_mx_ev_hist - _mid2) / _fill_hist if _mx_ev_hist != _mid2 else 1.0
-                                    _lo2 = (_mid2 - _mn_ev_hist) / _fill_hist if _mn_ev_hist != _mid2 else 1.0
-                                    _span2 = max(_up2, _lo2, 1.0)
-                                    _dom_ev_hist = [_mid2 - _span2, _mid2 + _span2]
-                                else:
-                                    _posE2 = (_mx_ev_hist / _fill_hist) if _mx_ev_hist > 0 else 1.0
-                                    _negE2 = (abs(_mn_ev_hist) / _fill_hist) if _mn_ev_hist < 0 else 0.0
-                                    _dom_ev_hist = ([-_negE2, _posE2] if _mn_ev_hist < 0 else [0.0, _posE2])
-                            ch_ev_hist = alt.Chart(df_ev_hist).mark_line().encode(
-                                x='step:Q',
-                                y=alt.Y('RewardThreshold:Q', scale=alt.Scale(domain=_dom_ev_hist, nice=False)),
-                                color=alt.Color('event_label:N', legend=alt.Legend(orient='right'))
-                            ).properties(width=700, height=450)
-                        else:
-                            ch_ev_hist = None
-                            print("警告：没有事件阈值数据可用")
-                        
                         # 缓存图表
                         st.session_state['cached_charts'] = {
-                            'ch_hist': ch_hist,
-                            'ch_ev_hist': ch_ev_hist
+                            'ch_hist': ch_hist
                         }
                     
                     # 显示图表（使用缓存或新计算的结果）
@@ -459,28 +399,13 @@ else:
                                 return '|'.join(labels)
                             except Exception:
                                 return ''
-                        def _evfb_to_str(s):
-                            try:
-                                itms = [p for p in str(s).split('|') if p]
-                                pairs = []
-                                for it in itms:
-                                    kv = it.split(':')
-                                    if len(kv) == 2:
-                                        ei = int(kv[0])
-                                        fb = float(kv[1])
-                                        label = EVENT_LABELS[ei] if ei < len(EVENT_LABELS) else str(ei)
-                                        pairs.append(f"{label}:{fb:.3f}")
-                                return '|'.join(pairs)
-                            except Exception:
-                                return ''
                         df_rewards['events_str'] = [ _ev_to_labels(s) for s in (df['events'].tolist() if 'events' in df.columns else ['']*len(df['step'].tolist())) ]
-                        df_rewards['events_feedback_str'] = [ _evfb_to_str(s) for s in (df['events_feedback'].tolist() if 'events_feedback' in df.columns else ['']*len(df['step'].tolist())) ]
                         ch_rewards = alt.Chart(df_rewards).transform_fold(['AdjReward', 'RawReward'], as_=['type', 'value']) \
                             .mark_line().encode(
                                 x='step:Q',
                                 y=alt.Y('value:Q', scale=alt.Scale(domain=_dom_r, nice=False)),
                                 color=alt.Color('type:N', legend=alt.Legend(orient='bottom', title=None)),
-                                tooltip=['step:Q', 'type:N', alt.Tooltip('value:Q', format='.3f'), 'events_str:N', 'events_feedback_str:N']
+                                tooltip=['step:Q', 'type:N', alt.Tooltip('value:Q', format='.3f'), 'events_str:N']
                             ).properties(width=700, height=450, title=alt.TitleParams('奖励 历史趋势', anchor='middle', fontSize=22))
 
                         df_mean = pd.DataFrame({

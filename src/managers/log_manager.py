@@ -15,7 +15,6 @@ class LogManager:
         """
         记录一步的训练数据。
         """
-        events_feedback = getattr(env, "last_events_feedback", [])
         events = getattr(env, 'last_events', None)
         raw_reward = getattr(env, 'last_total_reward_raw', None)
         
@@ -29,7 +28,6 @@ class LogManager:
             step,
             episode,
             action,
-            events_feedback,
             reward,
             agent._last_q,
             agent._last_q_mod,
@@ -47,7 +45,6 @@ class LogManager:
             step,
             episode,
             action,
-            events_feedback,
             reward,
             agent._last_q,
             agent._last_q_mod,
