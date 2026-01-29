@@ -4,8 +4,8 @@ from typing import Tuple
 @dataclass(frozen=True)
 class SceneConfig:
     """基础环境与采集配置。"""
-    img_width: int = 480
-    img_height: int = 270
+    img_width: int = 240 # 从 480 降至 240
+    img_height: int = 135 # 从 270 降至 135
     capture_fps: int = 60
     target_fps: int = 60
     camera_index: int = 1
@@ -23,9 +23,9 @@ class UIConfig:
 @dataclass(frozen=True)
 class RLConfig:
     """强化学习基础参数。"""
-    frame_history_len: int = 12
-    buffer_size: int = 100000
-    n_step_rewards: int = 20
+    frame_history_len: int = 4
+    buffer_size: int = 0 # 设置为 0 以在 PPO 训练中关闭冗余的 ReplayBuffer
+    n_step_rewards: int = 5
 
 @dataclass(frozen=True)
 class TrainConfig:

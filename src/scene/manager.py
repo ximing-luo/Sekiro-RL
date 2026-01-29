@@ -9,7 +9,7 @@ class SceneManager:
     场景管理器：负责窗口控制、图像采集线程管理以及游戏暂停/恢复逻辑。
     对应 Isaac Lab 中的 Scene 概念，但针对 Sekiro 进行了适配。
     """
-    def __init__(self, observation_w, observation_h, pos="offscreen", capture_fps=60):
+    def __init__(self, observation_w, observation_h, pos="top_left", capture_fps=60):
         self.width = observation_w
         self.height = observation_h
         self.capture_fps = capture_fps

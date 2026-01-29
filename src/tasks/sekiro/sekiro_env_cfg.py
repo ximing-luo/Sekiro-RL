@@ -15,7 +15,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     scene: SceneCfg = field(default_factory=lambda: SceneCfg(
         observation_w=config.cfg.scene.img_width,
         observation_h=config.cfg.scene.img_height,
-        pos="offscreen",
+        pos="top_left",
         capture_fps=config.cfg.scene.capture_fps,
         debug_vis_fps=config.cfg.ui.debug_vis_fps
     ))
@@ -39,7 +39,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
         "boss_health": RewardTermCfg(func=mdp.rewards.boss_health_reward, weight=1.0),
         "player_stamina": RewardTermCfg(func=mdp.rewards.player_stamina_reward, weight=1.0),
         "boss_stamina": RewardTermCfg(func=mdp.rewards.boss_stamina_reward, weight=1.0),
-        "survival": RewardTermCfg(func=mdp.rewards.survival_reward, weight=0.1),
+        "survival": RewardTermCfg(func=mdp.rewards.survival_reward, weight=1.0),
     })
     
     # 5. 终止项配置 (Termination Terms)

@@ -12,25 +12,38 @@ class RewardManager:
     def detect_events(self, prev_metrics, next_metrics):
         """
         根据状态变化检测发生的事件。
-        注意：为了彻底解耦，这里的硬编码逻辑未来可以迁移到单独的 EventManager。
         """
         events = []
-        sb, nsb = prev_metrics.get('self_blood', 0), next_metrics.get('self_blood', 0)
-        bb, nbb = prev_metrics.get('boss_blood', 0), next_metrics.get('boss_blood', 0)
-        ss, nss = prev_metrics.get('self_stamina', 0), next_metrics.get('self_stamina', 0)
-        bs, nbs = prev_metrics.get('boss_stamina', 0), next_metrics.get('boss_stamina', 0)
+        # 从嵌套的 telemetry 字典中提取指标
+        prev_tel = prev_metrics.get('telemetry', {})
+        next_tel = next_metrics.get('telemetry', {})
+        
+        sb, nsb = prev_tel.get('self_blood', 0), next_tel.get('self_blood', 0)
+        bb, nbb = prev_tel.get('boss_blood', 0), next_tel.get('boss_blood', 0)
+        ss, nss = prev_tel.get('self_stamina', 0), next_tel.get('self_stamina', 0)
+        bs, nbs = prev_tel.get('boss_stamina', 0), next_tel.get('boss_stamina', 0)
 
+        if bb - nbb > 1000: nbs = bs
+        bss = prev_tel.get('boss_stamina_max', 0)
         # 0: 自身死亡, 1: Boss死亡, 2: 自身掉血, 3: 自身回血, 4: 自身血量过低, 
-        # 5: Boss掉血, 6: 自身架势上升, 7: Boss架势上升, 8: Boss架势过低
-        if sb < 100 and nsb - sb > 500: events.append(0)
-        if nbb == 0 and bb - nbb > 50 and nbs > 400: events.append(1)
-        if nsb - sb < -2: events.append(2)
-        if 100 <= sb < 300 and nsb - sb >= 100: events.append(3)
+        # 5: Boss掉血, 6: 自身架势恶化(数值减小), 7: Boss架势恶化(数值减小), 8: Boss架势过低(可忍杀)
+        
+        # 自身死亡：血量瞬间从低位跳变到高位（重生）
+        if sb < 400 and nsb > 600: events.append(0)
+        # Boss死亡：血量归零且架势条重置
+        if nbb == 0 and bb > 0: events.append(1)
+        # 自身掉血
+        if nsb < sb: events.append(2)
+        # 自身血量过低（危险信号）
         if nsb <= 200: events.append(4)
-        if nbb - bb <= -5: events.append(5)
-        if nss - ss >= 2: events.append(6)
-        if nbs - bs >= 2: events.append(7)
-        if nbs <= 20: events.append(8)
+        # Boss掉血（有效攻击）
+        if nbb < bb: events.append(5)
+        # 自身架势恶化：只狼架势条是向下扣的，数值减小代表架势条变长/变黄
+        if nss < ss: events.append(6)
+        # Boss架势恶化：数值减小代表 Boss 快被破防了
+        if nbs < bs: events.append(7)
+        # 即使数值没变，如果架势条维持在低位（被持续压制），也给一个微弱的持续奖励
+        if nbs < bss - 100: events.append(9)
             
         return events
 

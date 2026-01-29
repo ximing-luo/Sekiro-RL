@@ -67,3 +67,51 @@ class FrameCapture:
                 self.cap.release()
             except Exception:
                 pass
+
+if __name__ == '__main__':
+    # 调试代码：实例化 FrameCapture 并显示画面
+    # 默认使用配置中的参数，如果没有配置则手动指定
+    try:
+        from configs.config import cfg
+        camera_idx = cfg.scene.camera_index
+        c_width = cfg.scene.camera_width
+        c_height = cfg.scene.camera_height
+        fps = cfg.scene.capture_fps
+        t_width = cfg.scene.img_width
+        t_height = cfg.scene.img_height
+    except Exception as e:
+        print(f"配置加载失败，使用默认参数: {e}")
+        camera_idx = 1
+        c_width = 1920
+        c_height = 1080
+        fps = 60
+        t_width = 480//2
+        t_height = 270//2
+
+    capture = FrameCapture(
+        camera_index=camera_idx,
+        camera_width=c_width,
+        camera_height=c_height,
+        fps=fps,
+        target_width=t_width,
+        target_height=t_height
+    )
+    capture.start()
+    
+    print(f"开始预览 (Camera Index: {camera_idx})，按 'q' 键退出...")
+    try:
+        while True:
+            if capture.latest_frame is not None:
+                # 显示采集到的画面
+                cv2.imshow('FrameCapture Debug', capture.latest_frame)
+            
+            # 等待 1ms 检查按键，按 'q' 键退出
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    except KeyboardInterrupt:
+        print("\n用户中断调试")
+    finally:
+        capture.stop()
+        cv2.destroyAllWindows()
+        print("已停止采集并关闭窗口")
+

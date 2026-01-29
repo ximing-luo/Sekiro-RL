@@ -76,7 +76,7 @@ class SekiroTelemetry:
         self.data["player_hp_max"] = self._read_r32(0x14)
         self.data["player_posture"] = self._read_r32(0x18)
         self.data["player_posture_max"] = self._read_r32(0x1C)
-        self.data["enemy_hp"] = self._read_r32(0x20)
+        self.data["enemy_hp"] = self._read_r32(0x20) # 已在上面过滤处理
         self.data["enemy_hp_max"] = self._read_r32(0x24)
         self.data["enemy_posture"] = self._read_r32(0x28)
         self.data["enemy_posture_max"] = self._read_r32(0x2C)
@@ -111,5 +111,10 @@ class SekiroTelemetry:
             self.data["player_hp"],
             self.data["enemy_hp"],
             self.data["player_posture"],
-            self.data["enemy_posture"]
+            self.data["enemy_posture"],
+            self.data["enemy_posture_max"],
         )
+
+if __name__ == "__main__":
+    sek = SekiroTelemetry
+

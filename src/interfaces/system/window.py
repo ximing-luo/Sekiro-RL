@@ -63,14 +63,14 @@ def find_window_by_title_contains(title_part, strict=False):
 def activate_window_by_title_contains(window_title_part, strict=False):
     hwnd = find_window_by_title_contains(window_title_part, strict=strict)
     if not hwnd:
-        print(f"Window containing '{window_title_part}' (strict={strict}) not found.")
         return False
 
     try:
-        win32gui.SetForegroundWindow(hwnd)
-        if win32gui.IsIconic(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        print(f"Window containing '{window_title_part}' activated.")
+        if win32gui.GetForegroundWindow() != hwnd:
+            win32gui.SetForegroundWindow(hwnd)
+            if win32gui.IsIconic(hwnd):
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            print(f"Window '{window_title_part}' activated.")
         return True
     except Exception as e:
         print(f"Error activating window: {e}")
@@ -159,6 +159,5 @@ def move_window(window_title_part, position, strict=False):
         return False
 
 if __name__ == '__main__':
-    activate_window_by_title_contains("Cheat Engine")
-    set_window_topmost("Cheat Engine")
-    
+    move_window("Sekiro", "top_left")
+    activate_window_by_title_contains("Sekiro")

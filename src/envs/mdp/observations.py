@@ -10,12 +10,13 @@ telemetry.start() # 启动后台刷新
 
 def memory_metrics(env, **kwargs):
     """从内存读取的基础数值指标。"""
-    sb, bb, ss, bs = telemetry.get_metrics()
+    sb, bb, ss, bs, bss = telemetry.get_metrics()
     return {
         'self_blood': sb,
         'boss_blood': bb,
         'self_stamina': ss,
-        'boss_stamina': bs
+        'boss_stamina': bs,
+        'boss_stamina_max': bss
     }
 
 def image_frame(env, **kwargs):

@@ -48,6 +48,9 @@ class ManagerBasedEnv:
         should_over, paused = self.scene_manager.check_pause(paused)
         return should_over, paused
 
+    def activate_window(self):
+        self.scene_manager.activate_window()
+
     def close(self):
         """清理资源。"""
         if self.scene_manager:
