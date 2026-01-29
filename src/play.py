@@ -13,12 +13,12 @@ import configs.config as config
 
 def play_agent(
     pos="offscreen",
-    img_width=480,
-    img_height=270,
+    img_width=config.cfg.scene.img_width,
+    img_height=config.cfg.scene.img_height,
     action_dim=None,
     total_interaction_steps=100000,
-    model_path=config.MODEL_PATH,
-    n_step_rewards: int = 20,
+    model_path=config.cfg.path.model_path,
+    n_step_rewards: int = config.cfg.rl.n_step_rewards,
 ):
     """
     运行代理模型入口（推理模式）。

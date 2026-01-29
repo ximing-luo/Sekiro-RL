@@ -10,11 +10,11 @@ class DQN(BaseAgent):
     """
     DQN 算法实现，遵循框架接口。
     """
-    def __init__(self, model_fn, action_dim, buffer, device="cuda", lr=1e-4, gamma=0.99, target_update_freq=1000, n_step_rewards=1):
+    def __init__(self, model_fn, action_dim, buffer, device="cuda", lr=None, gamma=None, target_update_freq=None, n_step_rewards=1):
         super().__init__(action_dim, device)
         self.buffer = buffer
-        self.gamma = gamma
-        self.target_update_freq = target_update_freq
+        self.gamma = gamma if gamma is not None else config.cfg.train.gamma
+        self.target_update_freq = target_update_freq if target_update_freq is not None else config.cfg.train.target_update_freq
         self.n_step_rewards = n_step_rewards
         
         # 网络初始化
@@ -23,7 +23,8 @@ class DQN(BaseAgent):
         self.target_net.load_state_dict(self.eval_net.state_dict())
         self.target_net.eval()
         
-        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=lr)
+        effective_lr = lr if lr is not None else config.cfg.train.lr
+        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=effective_lr)
         self.criterion = nn.SmoothL1Loss()
         
         self.optimizer_lock = threading.Lock()
@@ -58,11 +59,12 @@ class DQN(BaseAgent):
     def record(self, state, action, reward, next_state, done):
         self.buffer.add(state, action, reward, done)
 
-    def learn(self, batch_size=32):
+    def learn(self, batch_size=None):
+        effective_batch_size = batch_size if batch_size is not None else config.cfg.train.batch_size
         if self.n_step_rewards > 1:
-            if not self.buffer.can_sample_n_step(batch_size, self.n_step_rewards):
+            if not self.buffer.can_sample_n_step(effective_batch_size, self.n_step_rewards):
                 return
-        elif not self.buffer.can_sample(batch_size):
+        elif not self.buffer.can_sample(effective_batch_size):
             return
 
         # 尝试获取锁，如果已经在优化中则跳过，避免线程积压
@@ -72,10 +74,10 @@ class DQN(BaseAgent):
         try:
             # 采样
             if self.n_step_rewards > 1:
-                obs, act, rew, next_obs, done, steps_used, idxes, weights = self.buffer.sample_n_step_per(batch_size, self.n_step_rewards, self.gamma)
+                obs, act, rew, next_obs, done, steps_used, idxes, weights = self.buffer.sample_n_step_per(effective_batch_size, self.n_step_rewards, self.gamma)
                 gamma_power = self.gamma ** steps_used
             else:
-                obs, act, rew, next_obs, done, idxes, weights = self.buffer.sample_per(batch_size)
+                obs, act, rew, next_obs, done, idxes, weights = self.buffer.sample_per(effective_batch_size)
                 gamma_power = self.gamma
 
             obs_t = torch.FloatTensor(obs).to(self.device)

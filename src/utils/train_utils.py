@@ -68,16 +68,17 @@ class SekiroRunner:
         self.env.reset()
         self.last_print_time = time.time()
         
-        # Epsilon 探索参数
-        EPS_START, EPS_END, EPS_DECAY = 1.0, 0.1, 50000
-
         for _ in range(total_steps):
             loop_start = time.time()
             
             # 1. 计算探索率并更新步数
             epsilon = 0.0
             if is_train:
-                epsilon = EPS_END + (EPS_START - EPS_END) * max(0, (EPS_DECAY - global_step) / EPS_DECAY)
+                # 使用 config 中的探索参数
+                eps_start = config.cfg.epsilon.eps_start
+                eps_end = config.cfg.epsilon.eps_end
+                eps_decay = config.cfg.epsilon.eps_decay
+                epsilon = eps_end + (eps_start - eps_end) * max(0, (eps_decay - global_step) / eps_decay)
             
             global_step += 1
             self.agent.current_step = global_step
@@ -119,8 +120,9 @@ class SekiroRunner:
                 self.env.over = True
                 break
             
-            # 8. 帧率控制 (60Hz)
-            target_dt = 1.0 / 60.0
+            # 8. 帧率控制
+            target_fps = config.cfg.scene.target_fps
+            target_dt = 1.0 / target_fps
             actual_dt = time.time() - loop_start
             if actual_dt < target_dt:
                 time.sleep(target_dt - actual_dt)
@@ -136,7 +138,7 @@ class SekiroRunner:
 
     def _maybe_optimize(self, step):
         """触发异步模型学习。"""
-        freq = getattr(config, 'OPTIMIZE_EVERY_STEPS', 1)
+        freq = config.cfg.train.optimize_every_steps
         if step % int(freq) == 0:
             threading.Thread(target=self.agent.learn, daemon=True).start()
 

@@ -16,12 +16,12 @@ import configs.config as config
 
 def train_agent(
     pos="offscreen",
-    img_width=480,
-    img_height=270,
+    img_width=config.cfg.scene.img_width,
+    img_height=config.cfg.scene.img_height,
     action_dim=None,
     total_interaction_steps=10000,
-    model_path=config.MODEL_PATH,
-    n_step_rewards: int = 20,
+    model_path=config.cfg.path.model_path,
+    n_step_rewards: int = config.cfg.rl.n_step_rewards,
 ):
     """
     训练代理模型入口。
@@ -32,14 +32,14 @@ def train_agent(
     runner = SekiroRunner(env, agent)
     
     # 2. 确保目录存在并配置可视化
-    os.makedirs(config.LOG_DIR, exist_ok=True)
-    os.makedirs(os.path.dirname(config.MODEL_PATH), exist_ok=True)
+    os.makedirs(config.cfg.path.log_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(config.cfg.path.model_path), exist_ok=True)
     
-    writer = SummaryWriter(log_dir=config.LOG_DIR)
-    register_tensorboard_hooks(agent, writer)
+    writer = SummaryWriter(log_dir=config.cfg.path.log_dir)
+    register_tensorboard_hooks(agent, writer, log_interval=config.cfg.path.tb_log_interval)
     
     # 3. 加载历史训练计数
-    last_step, last_episode = load_last_training_stats(config.LOG_DIR)
+    last_step, last_episode = load_last_training_stats(config.cfg.path.log_dir)
     global_step = int(last_step)
     
     # 4. 准备训练环境

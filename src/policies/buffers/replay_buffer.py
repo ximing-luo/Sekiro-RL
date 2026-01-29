@@ -2,6 +2,7 @@ import numpy as np
 import random
 from collections import deque
 from src.policies.buffers.base import BaseBuffer
+import configs.config as config
 
 class ReplayBuffer(BaseBuffer):
     """
@@ -10,13 +11,17 @@ class ReplayBuffer(BaseBuffer):
     2. 优先经验回放 (Prioritized Experience Replay)
     3. N-步奖励 (N-step Rewards)
     """
-    def __init__(self, size, frame_history_len=4, obs_shape=None, alpha=0.6, beta=0.4):
+    def __init__(self, size, frame_history_len=4, obs_shape=None, alpha=None, beta=None):
         super().__init__(size)
         self.frame_history_len = frame_history_len
         self.obs_shape = obs_shape
-        self.alpha = alpha
-        self.beta = beta
-        self.beta_increment_per_sampling = 0.001
+        self.alpha = alpha if alpha is not None else config.cfg.per.alpha
+        self.beta = beta if beta is not None else config.cfg.per.beta_start
+        
+        # 计算 beta 增长步数
+        beta_steps = config.cfg.per.beta_steps
+        beta_end = config.cfg.per.beta_end
+        self.beta_increment_per_sampling = (beta_end - self.beta) / beta_steps if beta_steps > 0 else 0.001
         
         # 使用循环数组存储，提高效率
         self.observations = [None] * size
@@ -69,7 +74,10 @@ class ReplayBuffer(BaseBuffer):
         # 计算重要性采样权重
         weights = (self.size * probs[indices]) ** (-self.beta)
         weights /= weights.max()
-        self.beta = min(1.0, self.beta + self.beta_increment_per_sampling)
+        
+        # 更新 beta
+        beta_end = config.cfg.per.beta_end
+        self.beta = min(beta_end, self.beta + self.beta_increment_per_sampling)
         
         obs, act, rew, next_obs, done = self._get_samples(indices)
         return obs, act, rew, next_obs, done, indices, weights
