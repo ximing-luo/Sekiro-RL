@@ -15,12 +15,11 @@ import cv2
 import numpy as np
 
 class FrameCapture:
-    def __init__(self, camera_index, camera_width, camera_height, fps, replay_buffer, target_width, target_height):
+    def __init__(self, camera_index, camera_width, camera_height, fps, target_width, target_height):
         self.camera_index = camera_index
         self.camera_width = camera_width
         self.camera_height = camera_height
         self.fps = fps
-        self.replay_buffer = replay_buffer
         self.target_width = target_width
         self.target_height = target_height
         self.cap = None
@@ -49,11 +48,9 @@ class FrameCapture:
                 if not ret or observe is None:
                     continue
 
-                # 核心代码逻辑：读取帧、缩放、存储到缓冲区
-                self.latest_frame = observe
+                # 核心代码逻辑：读取帧、缩放、更新最新帧
                 observe_resize = cv2.resize(observe, (self.target_width, self.target_height), interpolation=cv2.INTER_AREA)
-                frame = np.array(observe_resize).reshape(-1, self.target_height, self.target_width, 3)[0]
-                self.replay_buffer.store_frame(frame)
+                self.latest_frame = np.array(observe_resize).reshape(self.target_height, self.target_width, 3)
 
                 if period > 0.0:
                     dt = time.time() - t0

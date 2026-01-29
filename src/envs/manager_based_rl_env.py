@@ -48,8 +48,8 @@ class ManagerBasedRLEnv(ManagerBasedEnv):
         # 1. 执行动作
         self.action_manager.apply_action(action)
 
-        # 2. 获取新观测指标
-        next_metrics = self.observation_manager.compute_observations()
+        # 2. 获取新观测指标（包含图像）
+        next_metrics = self.observation_manager.compute_observations(self.scene_manager)
         if self.last_metrics is None:
             self.last_metrics = next_metrics
 
@@ -64,16 +64,23 @@ class ManagerBasedRLEnv(ManagerBasedEnv):
         self.last_total_reward_raw = float(reward)
         self.last_events = list(events)
         self.last_events_feedback = [[int(e), float(components.get(int(e), 0.0))] for e in events]
-        self.last_metrics = next_metrics
         
         # 6. 写入回放缓冲
-        self.replay_buffer.store_effect(action, float(reward), done)
+        # 如果获取到了图像帧，则存入
+        if next_metrics.get('frame') is not None:
+            self.replay_buffer.add(next_metrics['frame'], action, float(reward), done)
+            
+        self.last_metrics = next_metrics
 
         return float(reward)
 
     def reset(self):
         """重置环境状态。"""
-        self.last_metrics = self.observation_manager.compute_observations()
+        self.last_metrics = self.observation_manager.compute_observations(self.scene_manager)
+        if self.last_metrics.get('frame') is not None:
+            # 重置时也存入一帧，确保 buffer 不为空
+            self.replay_buffer.add(self.last_metrics['frame'], 0, 0.0, False)
+            
         self.termination_manager.reset()
         self.over = False
         return self.last_metrics

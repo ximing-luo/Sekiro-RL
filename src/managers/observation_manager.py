@@ -9,16 +9,8 @@ class ObservationManager:
     def __init__(self, replay_buffer):
         self.replay_buffer = replay_buffer
         self.frame_history_len = config.FRAME_HISTORY_LEN
-        
-        # 内部状态缓存
-        self.current_metrics = {
-            'self_blood': 0,
-            'boss_blood': 0,
-            'self_stamina': 0,
-            'boss_stamina': 0
-        }
 
-    def compute_observations(self):
+    def compute_observations(self, scene_manager=None):
         """获取最新的数值指标和图像观测。"""
         # 1. 从内存提取指标
         sb, bb, ss, bs = extract_metrics_from_memory()
@@ -30,10 +22,11 @@ class ObservationManager:
             'boss_stamina': bs
         }
         
-        # 2. 从回放缓冲获取堆叠帧（如果需要在此处获取）
-        # 注意：在原始代码中，stacked_np 是在 train.py 中获取的，
-        # 但在 Isaac Lab 架构中，环境应该返回完整的 obs。
-        # 为了兼容性，我们先只管理数值指标。
+        # 2. 获取最新图像帧
+        frame = None
+        if scene_manager:
+            frame = scene_manager.get_latest_frame()
+            metrics['frame'] = frame
         
         return metrics
 

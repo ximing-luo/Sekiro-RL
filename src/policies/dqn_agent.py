@@ -33,8 +33,6 @@ class DQNAgent(BaseAgent):
             target_update_freq=config.TARGET_UPDATE_FREQ,
             n_step_rewards=n_step_rewards
         )
-        
-        self.run_id = self.algorithm.optimize_count # 保持兼容性
 
     def act(self, state, epsilon=0.0):
         # 如果 state 是包含 batch 维度的 tensor，需要处理
@@ -45,10 +43,6 @@ class DQNAgent(BaseAgent):
                 state = state.cpu().numpy()
         return self.algorithm.act(state, epsilon)
 
-    def select_action(self, state, epsilon=0.0):
-        """兼容旧接口：根据状态选择动作。"""
-        return self.act(state, epsilon)
-
     def record(self, state, action, reward, next_state, done):
         self.algorithm.record(state, action, reward, next_state, done)
 
@@ -58,18 +52,19 @@ class DQNAgent(BaseAgent):
     def save(self, path=None):
         self.algorithm.save(path or self.model_file)
 
-    def save_model(self, path=None):
-        """兼容旧接口：保存模型。"""
-        self.save(path)
-
     def load(self, path=None):
         self.algorithm.load(path or self.model_file)
 
-    def load_model(self, path=None):
-        """兼容旧接口：加载模型。"""
-        self.load(path)
+    def train(self):
+        """切换到训练模式。"""
+        if hasattr(self.algorithm, 'eval_net'):
+            self.algorithm.eval_net.train()
 
-    # 为了兼容 train.py 的一些属性访问
+    def eval(self):
+        """切换到评估模式。"""
+        if hasattr(self.algorithm, 'eval_net'):
+            self.algorithm.eval_net.eval()
+
     @property
     def optimize_count(self):
         return self.algorithm.optimize_count
@@ -79,10 +74,5 @@ class DQNAgent(BaseAgent):
         return self.algorithm.last_loss
 
     @property
-    def _last_q(self):
+    def last_q(self):
         return getattr(self.algorithm, '_last_q', None)
-    
-    @property
-    def _last_q_mod(self):
-        # 兼容旧日志逻辑，由于移除了阈值，mod Q 等于原始 Q
-        return self._last_q

@@ -27,11 +27,7 @@ class ReplayBuffer(BaseBuffer):
         
         self.pos = 0
         self.size = 0
-        self.capacity = size # 兼容基类属性
         self.max_priority = 1.0
-
-        # 用于视频流同步的辅助变量 (保持与旧代码兼容)
-        self.video_num_in_buffer = 0
 
     def sample(self, batch_size: int):
         """实现 BaseBuffer 的抽象方法。默认执行优先采样。"""
@@ -47,28 +43,6 @@ class ReplayBuffer(BaseBuffer):
         
         self.pos = (self.pos + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
-        self.video_num_in_buffer = self.size
-
-    def store_frame(self, frame):
-        """兼容旧接口：存储单帧图像。"""
-        self.observations[self.pos] = frame
-        self.priorities[self.pos] = self.max_priority
-        # 注意：此处不增加 size，因为还没有动作和奖励
-        # 但为了让 get_latest_observation 能工作，我们需要更新 pos
-        self.pos = (self.pos + 1) % self.capacity
-        self.size = min(self.size + 1, self.capacity)
-        self.video_num_in_buffer = self.size
-
-    def store_effect(self, action, reward, done):
-        """兼容旧接口：为最近存储的帧存储动作、奖励和结束标志。"""
-        last_idx = (self.pos - 1) % self.capacity
-        self.actions[last_idx] = action
-        self.rewards[last_idx] = reward
-        self.dones[last_idx] = done
-
-    def store_latest_observation(self, obs_stacked):
-        """兼容旧接口：存储最新观测。"""
-        pass
 
     def get_latest_observation(self, k):
         """获取最近 k 帧的堆叠。"""

@@ -9,10 +9,9 @@ class SceneManager:
     场景管理器：负责窗口控制、图像采集线程管理以及游戏暂停/恢复逻辑。
     对应 Isaac Lab 中的 Scene 概念，但针对 Sekiro 进行了适配。
     """
-    def __init__(self, observation_w, observation_h, replay_buffer, pos="offscreen", capture_fps=60):
+    def __init__(self, observation_w, observation_h, pos="offscreen", capture_fps=60):
         self.width = observation_w
         self.height = observation_h
-        self.replay_buffer = replay_buffer
         self.capture_fps = capture_fps
         self.pos = pos
         self.window_title = "Sekiro"
@@ -23,13 +22,16 @@ class SceneManager:
             camera_width=config.CAMERA_WIDTH,
             camera_height=config.CAMERA_HEIGHT,
             fps=self.capture_fps,
-            replay_buffer=self.replay_buffer,
             target_width=self.width,
             target_height=self.height,
         )
         
         # 调试可视化
         self._input_vis_runner = None
+
+    def get_latest_frame(self):
+        """获取最新的采集帧。"""
+        return self._frame_capture.latest_frame
 
     def setup(self):
         """初始化场景：启动采集、移动并激活窗口。"""

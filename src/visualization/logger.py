@@ -125,6 +125,52 @@ def write_json(log_dir, run_id, step, episode, action, adj_reward, last_q, last_
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False)
 
+def load_last_training_stats(log_dir: str):
+    """职责：从日志目录中加载最后的训练步数和回合数。
+
+    实现步骤：
+    1) 尝试从 latest.json 加载；
+    2) 尝试从 train_metrics.csv 加载（如果 CSV 中的步数更大）；
+    3) 返回 (last_step, last_episode)；
+
+    函数用来干什么：恢复训练进度，避免从零开始。
+    参数说明：
+    - 输入：`log_dir`（str）：日志目录
+    - 输出：`(last_step, last_episode)`（tuple）
+    """
+    last_step = 0
+    last_episode = 0
+
+    # 1. 尝试从 latest.json 加载
+    json_path = os.path.join(log_dir, 'latest.json')
+    if os.path.isfile(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            last_step = int(data.get('step', 0))
+            last_episode = int(data.get('episode', 0))
+        except Exception:
+            pass
+
+    # 2. 尝试从 train_metrics.csv 加载更准确的/最新的数据
+    csv_path = os.path.join(log_dir, 'train_metrics.csv')
+    if os.path.isfile(csv_path):
+        try:
+            import pandas as pd
+            # 读取 CSV 并获取最后一行
+            df = pd.read_csv(csv_path)
+            if not df.empty:
+                last_row = df.iloc[-1]
+                csv_step = int(last_row.get('step', 0))
+                csv_episode = int(last_row.get('episode', 0))
+                # 如果 CSV 的步数更新，则以 CSV 为准
+                if csv_step > last_step:
+                    last_step = csv_step
+                    last_episode = csv_episode
+        except Exception:
+            pass
+
+    return last_step, last_episode
 
 class InputVisRunner:
     """职责：以固定帧率循环显示输入序列帧，便于观察状态堆叠。

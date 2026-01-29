@@ -35,7 +35,6 @@ class ManagerBasedEnv:
         self.scene_manager = SceneManager(
             scene_cfg.observation_w, 
             scene_cfg.observation_h, 
-            self.replay_buffer, 
             scene_cfg.pos, 
             scene_cfg.capture_fps
         )
