@@ -1,27 +1,19 @@
-from src.envs.mdp.terminations import check_simple_termination
+from typing import Dict
+from src.envs.manager_based_env_cfg import TerminationTermCfg
 
 class TerminationManager:
     """
-    终止管理器：负责判断回合是否结束。
-    对应 Isaac Lab 中的 TerminationManager。
+    终止管理器：实现基于术语的终止判定。
     """
-    def __init__(self):
-        self.emergence_break = 0
+    def __init__(self, cfg: Dict[str, TerminationTermCfg]):
+        self.cfg = cfg
 
-    def check_termination(self, prev_metrics, next_metrics, events):
-        """判断是否达到终止条件（如死亡、胜利）。"""
-        done = 0
-        
-        # 使用 MDP 中的判定逻辑
-        if check_simple_termination(events):
-            if self.emergence_break < 1:
-                done = 1
-                self.emergence_break += 1
-            else:
-                done = 1
-                self.emergence_break = 100
-        
-        return done
+    def check_termination(self, env, prev_metrics, next_metrics, events):
+        """遍历所有终止项，任何一项返回 True 则终止（或根据 Cfg 逻辑组合）。"""
+        for name, term_cfg in self.cfg.items():
+            if term_cfg.func(env=env, prev_metrics=prev_metrics, next_metrics=next_metrics, events=events, **term_cfg.params):
+                return True
+        return False
 
     def reset(self):
-        self.emergence_break = 0
+        pass

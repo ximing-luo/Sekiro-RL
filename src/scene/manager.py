@@ -18,9 +18,9 @@ class SceneManager:
         
         # 图像采集模块
         self._frame_capture = FrameCapture(
-            camera_index=config.CAMERA_INDEX,
-            camera_width=config.CAMERA_WIDTH,
-            camera_height=config.CAMERA_HEIGHT,
+            camera_index=config.cfg.scene.camera_index,
+            camera_width=config.cfg.scene.camera_width,
+            camera_height=config.cfg.scene.camera_height,
             fps=self.capture_fps,
             target_width=self.width,
             target_height=self.height,

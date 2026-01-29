@@ -1,23 +1,17 @@
 from dataclasses import dataclass, field
-from src.envs.manager_based_env_cfg import SceneCfg
+from src.envs.manager_based_env_cfg import SceneCfg, RewardTermCfg, ObservationTermCfg, TerminationTermCfg, ActionTermCfg
 from src.envs.manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
+import src.envs.mdp as mdp
 import configs.config as config
 
 @dataclass
-class SekiroRewardCfg:
-    """奖励权重配置。"""
-    self_blood_gamma: float = 0.6
-    boss_blood_gamma: float = 0.4
-    self_stamina_gamma: float = 0.5
-    boss_stamina_gamma: float = 0.5
-    death_penalty: float = -200.0
-    victory_reward: float = 200.0
-
-@dataclass
 class SekiroEnvCfg(ManagerBasedRLEnvCfg):
-    """只狼环境的总配置类。"""
+    """
+    只狼环境的总配置类。
+    通过定义各个管理器的 Terms 来实现真正的逻辑抽象。
+    """
     
-    # 覆盖默认场景配置，从全局 config 获取默认值
+    # 1. 场景配置
     scene: SceneCfg = field(default_factory=lambda: SceneCfg(
         observation_w=config.cfg.scene.img_width,
         observation_h=config.cfg.scene.img_height,
@@ -26,10 +20,35 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
         debug_vis_fps=config.cfg.ui.debug_vis_fps
     ))
     
-    # 任务特有配置
-    rewards: SekiroRewardCfg = field(default_factory=SekiroRewardCfg)
+    # 2. 观测项配置 (Observation Terms)
+    observations: dict = field(default_factory=lambda: {
+        "policy": ObservationTermCfg(func=mdp.observations.image_frame), # 图像观测
+        "telemetry": ObservationTermCfg(func=mdp.observations.memory_metrics), # 数值指标
+    })
     
-    # 继承的 RL 配置
+    # 3. 动作项配置 (Action Terms)
+    actions: dict = field(default_factory=lambda: {
+        "body": ActionTermCfg(func=mdp.actions.sekiro_discrete_action, params={"dim": 10})
+    })
+    
+    # 4. 奖励项配置 (Reward Terms)
+    rewards: dict = field(default_factory=lambda: {
+        "player_death": RewardTermCfg(func=mdp.rewards.player_death_reward, weight=-200.0),
+        "boss_death": RewardTermCfg(func=mdp.rewards.boss_death_reward, weight=200.0),
+        "player_health": RewardTermCfg(func=mdp.rewards.player_health_reward, weight=1.0),
+        "boss_health": RewardTermCfg(func=mdp.rewards.boss_health_reward, weight=1.0),
+        "player_stamina": RewardTermCfg(func=mdp.rewards.player_stamina_reward, weight=1.0),
+        "boss_stamina": RewardTermCfg(func=mdp.rewards.boss_stamina_reward, weight=1.0),
+        "survival": RewardTermCfg(func=mdp.rewards.survival_reward, weight=0.1),
+    })
+    
+    # 5. 终止项配置 (Termination Terms)
+    terminations: dict = field(default_factory=lambda: {
+        "player_dead": TerminationTermCfg(func=mdp.terminations.player_dead_termination),
+        "boss_dead": TerminationTermCfg(func=mdp.terminations.boss_dead_termination),
+    })
+
+    # 6. RL 基础配置
     buffer_size: int = config.cfg.rl.buffer_size
     frame_history_len: int = config.cfg.rl.frame_history_len
     n_step_rewards: int = config.cfg.rl.n_step_rewards

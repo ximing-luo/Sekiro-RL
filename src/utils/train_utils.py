@@ -4,26 +4,27 @@ import torch
 import threading
 import numpy as np
 from collections import deque
-from src.tasks.sekiro.env import Sekiro
-from src.tasks.sekiro.sekiro_env_cfg import SekiroEnvCfg
+from src.tasks.registration import task_registry
+import src.tasks.sekiro # 确保 Sekiro 任务已注册
 from src.policies.dqn_agent import DQNAgent
-from src.envs.mdp.actions import action_count
 from src.interfaces.system.input import key_check
 import configs.config as config
 
-def init_env_agent(pos, img_width, img_height, action_dim, model_path, n_step_rewards):
-    """职责：初始化环境与代理模型。"""
-    ad = action_dim if action_dim is not None else int(action_count())
+def init_env_agent(task_name, pos, img_width, img_height, action_dim, model_path, n_step_rewards):
+    """职责：通过注册表初始化环境与代理模型。"""
+    # 1. 从注册表创建环境
+    env, env_cfg = task_registry.make(
+        task_name, 
+        pos=pos, 
+        observation_w=img_width, 
+        observation_h=img_height,
+        n_step_rewards=n_step_rewards
+    )
     
-    # 使用配置驱动初始化
-    cfg = SekiroEnvCfg()
-    cfg.scene.pos = pos
-    cfg.scene.observation_w = img_width
-    cfg.scene.observation_h = img_height
-    cfg.scene.debug_vis_fps = 60
-    cfg.n_step_rewards = n_step_rewards
+    # 2. 确定动作空间维度
+    ad = action_dim if action_dim is not None else env.action_dim
     
-    env = Sekiro(cfg=cfg)
+    # 3. 初始化 Agent
     agent = DQNAgent(img_width, img_height, ad, buffer=env.replay_buffer, model_file=model_path, n_step_rewards=n_step_rewards)
     
     if os.path.isfile(model_path):
@@ -39,7 +40,7 @@ def wait_buffer(env):
     print("等待缓冲区填充初始帧...")
     while len(env.replay_buffer) < env.replay_buffer.frame_history_len:
         # 手动执行一些空动作来填充缓冲区
-        env.step(0)
+        env.step(0) # 新接口下这里会返回 5 个值，但我们只需触发 step
         time.sleep(0.05)
     time.sleep(0.2)
 
@@ -90,8 +91,8 @@ class SekiroRunner:
             
             action = self.agent.act(state, epsilon=epsilon)
             
-            # 3. 与环境交互
-            reward = self.env.step(action)
+            # 3. 与环境交互 (使用标准 Gymnasium 接口)
+            obs, reward, terminated, truncated, info = self.env.step(action)
             self.recent_rewards.append(float(reward))
 
             # 4. 训练优化 (仅训练模式)
@@ -116,7 +117,7 @@ class SekiroRunner:
 
             # 7. 游戏控制与暂停逻辑
             self.env.pause_game(False)
-            if self.env.over or "P" in key_check():
+            if terminated or truncated or "P" in key_check():
                 self.env.over = True
                 break
             

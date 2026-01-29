@@ -1,20 +1,24 @@
 import threading
-from src.envs.mdp.actions import get_action_callable, action_count, assert_config_consistency
+from typing import Dict
+from src.envs.manager_based_env_cfg import ActionTermCfg
 
 class ActionManager:
     """
-    动作管理器：负责动作映射和键盘指令的异步执行。
-    对应 Isaac Lab 中的 ActionManager。
+    动作管理器：实现基于术语的动作执行。
     """
-    def __init__(self, action_dim=None):
-        self.action_dim = int(action_dim) if action_dim is not None else int(action_count())
-        assert_config_consistency(self.action_dim)
+    def __init__(self, cfg: Dict[str, ActionTermCfg]):
+        self.cfg = cfg
+        # 目前 Sekiro 主要是离散动作空间，从第一个 Term 获取映射
+        # 未来可以支持多个 Action Term 组合
+        self.action_term = list(cfg.values())[0] if cfg else None
 
-    def apply_action(self, action):
-        """异步执行动作，避免阻塞主循环。"""
-        # 注意：在重构后的架构中，这里也可以通过接口控制不同的执行器（如键盘、控制器）
-        fn = get_action_callable(action)
-        threading.Thread(target=fn, daemon=True).start()
+    def apply_action(self, env, action):
+        """执行动作。"""
+        if self.action_term:
+            # 获取动作函数并异步执行
+            fn = self.action_term.func(action, **self.action_term.params)
+            threading.Thread(target=fn, daemon=True).start()
 
     def get_action_dim(self):
-        return self.action_dim
+        # 假设 action_term 的 params 中包含 dim 信息
+        return self.action_term.params.get('dim', 0) if self.action_term else 0

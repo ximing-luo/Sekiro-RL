@@ -8,7 +8,7 @@ class LogManager:
     遵循 Isaac Lab 的管理器设计理念，将日志记录逻辑从主环境类中解耦。
     """
     def __init__(self, log_dir=None):
-        self.log_dir = log_dir or config.LOG_DIR
+        self.log_dir = log_dir or config.cfg.path.log_dir
         os.makedirs(self.log_dir, exist_ok=True)
         
     def log_step(self, agent, env, step, episode, action, reward, recent_rewards, fps, epsilon):
