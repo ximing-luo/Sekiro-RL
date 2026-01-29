@@ -33,7 +33,7 @@ try:
 except Exception:
     _HAS_MPL = False
 
-def write_csv(log_dir, run_id, step, episode, action, events_feedback, adj_reward, last_q, last_q_mod, desire_thresholds_row, reward_thresholds_action, raw_reward=None, adv_values=None, adv_values_shrink=None, state_value=None, events=None, noop_1s_count=None, action_recent_counts=None, reward_avg_recent=None, epsilon=None):
+def write_csv(log_dir, run_id, step, episode, action, events_feedback, adj_reward, last_q, last_q_mod, desire_thresholds_row=None, reward_thresholds_action=None, raw_reward=None, adv_values=None, adv_values_shrink=None, state_value=None, events=None, noop_1s_count=None, action_recent_counts=None, reward_avg_recent=None, epsilon=None):
     """职责：将训练关键度量以 CSV 形式追加到日志文件。
 
     实现步骤：
@@ -75,8 +75,8 @@ def write_csv(log_dir, run_id, step, episode, action, events_feedback, adj_rewar
         'reward_avg_recent': (float(reward_avg_recent) if reward_avg_recent is not None else None),
         'q_values': ';'.join([f"{float(x):.6f}" for x in (list(last_q) if last_q is not None else [])]),
         'q_values_mod': ';'.join([f"{float(x):.6f}" for x in (list(last_q_mod) if last_q_mod is not None else [])]),
-        'desire_thresholds': ';'.join([f"{float(x):.6f}" for x in desire_thresholds_row]),
-        'reward_thresholds_action': ';'.join([f"{float(x):.6f}" for x in reward_thresholds_action]),
+        'desire_thresholds': ';'.join([f"{float(x):.6f}" for x in (list(desire_thresholds_row) if desire_thresholds_row is not None else [])]),
+        'reward_thresholds_action': ';'.join([f"{float(x):.6f}" for x in (list(reward_thresholds_action) if reward_thresholds_action is not None else [])]),
         'adv_values': ';'.join([f"{float(x):.6f}" for x in (list(adv_values) if adv_values is not None else [])]),
         'adv_values_shrink': ';'.join([f"{float(x):.6f}" for x in (list(adv_values_shrink) if adv_values_shrink is not None else [])]),
         'state_value': (float(state_value) if state_value is not None else None),
@@ -94,7 +94,7 @@ def write_csv(log_dir, run_id, step, episode, action, events_feedback, adj_rewar
             w.writeheader()
         w.writerow(row)
 
-def write_json(log_dir, run_id, step, episode, action, events_feedback, adj_reward, last_q, last_q_mod, desire_thresholds_row, reward_thresholds_action, reward_thresholds_full, fps=None, adv_values=None, state_value=None, events=None, raw_reward=None, noop_1s_count=None, adv_values_shrink=None, feat_input_b64=None, feat_static_b64=None, feat_dynamic_b64=None, f0_last_maps_b64=None, static_layers_b64=None, dynamic_layers_b64=None, action_recent_counts=None, reward_avg_recent=None, epsilon=None):
+def write_json(log_dir, run_id, step, episode, action, events_feedback, adj_reward, last_q, last_q_mod, desire_thresholds_row=None, reward_thresholds_action=None, reward_thresholds_full=None, fps=None, adv_values=None, state_value=None, events=None, raw_reward=None, noop_1s_count=None, adv_values_shrink=None, feat_input_b64=None, feat_static_b64=None, feat_dynamic_b64=None, f0_last_maps_b64=None, static_layers_b64=None, dynamic_layers_b64=None, action_recent_counts=None, reward_avg_recent=None, epsilon=None):
     """职责：将最近一次训练度量写入 JSON 文件，便于前端读取与可视化。
 
     实现步骤：
@@ -115,8 +115,8 @@ def write_json(log_dir, run_id, step, episode, action, events_feedback, adj_rewa
     q_vals = [float(x) for x in (list(last_q) if last_q is not None else [])]
     q_mods = [float(x) for x in (list(last_q_mod) if last_q_mod is not None else [])]
     des_row = [float(x) for x in (list(desire_thresholds_row) if desire_thresholds_row is not None else [])]
-    r_act = [float(x) for x in reward_thresholds_action]
-    r_full = [[float(x) for x in row] for row in reward_thresholds_full]
+    r_act = [float(x) for x in (list(reward_thresholds_action) if reward_thresholds_action is not None else [])]
+    r_full = [[float(x) for x in row] for row in (list(reward_thresholds_full) if reward_thresholds_full is not None else [])]
     adv_vals = [float(x) for x in (list(adv_values) if adv_values is not None else [])]
     adv_vals_shrink = [float(x) for x in (list(adv_values_shrink) if adv_values_shrink is not None else [])]
     # 步骤 3：组装 payload

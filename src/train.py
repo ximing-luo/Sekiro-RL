@@ -83,19 +83,28 @@ def _register_tensorboard_hooks(agent: DQNAgent, writer: SummaryWriter):
         return hook
 
     model = agent.algorithm.eval_net
-    # 注册 Hook 到感兴趣的层
-    # ResNet 结构通常有: conv1, conv2_x, conv3_x, conv4_x, conv5_x
-    layers_to_hook = {
-        'Conv1': model.conv1,
-        'Layer1': model.conv2_x,
-        'Layer2': model.conv3_x,
-        'Layer3': model.conv4_x,
-        'Layer4': model.conv5_x
-    }
+    # 动态发现所有 Conv2d 层以支持不同架构的模型（如 ResNet, SimpleDQN 等）
+    conv_layers = []
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            conv_layers.append((name, module))
+    
+    layers_to_hook = {}
+    if len(conv_layers) > 0:
+        # 均匀采样最多 5 个卷积层进行可视化
+        indices = np.linspace(0, len(conv_layers) - 1, min(5, len(conv_layers)), dtype=int)
+        for i, idx in enumerate(indices):
+            name, layer = conv_layers[idx]
+            # 缩短显示名称，只保留最后一部分
+            display_name = name.split('.')[-1] if '.' in name else name
+            layers_to_hook[f"{i}_{display_name}"] = layer
 
     for name, layer in layers_to_hook.items():
         layer.register_forward_hook(get_activation(name))
-    print("TensorBoard Hooks 已注册。")
+    if layers_to_hook:
+        print(f"已自动注册 {len(layers_to_hook)} 个 TensorBoard Hooks。")
+    else:
+        print("未发现可注册 Hook 的卷积层。")
 
 def _load_last_training_counters(log_dir: str):
     last_step = 0
@@ -291,7 +300,7 @@ def train_agent(
     print("训练结束。")
 
 
-def run_agent(
+def play_agent(
     pos="offscreen",
     img_width=480,
     img_height=270,
@@ -384,6 +393,6 @@ def run_agent(
 
 if __name__ == "__main__":
     train_agent()
-    # run_agent() # 默认改为运行推理模式，或者让用户自己选择
+    # play_agent() # 默认改为运行推理模式，或者让用户自己选择
     time.sleep(1.0)
     window_utils.move_window("Sekiro", "center")

@@ -3,6 +3,7 @@ import torch
 from src.policies.base.agent import BaseAgent
 from src.policies.dqn import DQN as DQN_Algorithm
 from src.models.resnet import ddqn_res18
+from src.models.simple_dqn import ddqn_simple
 import configs.config as config
 
 class DQNAgent(BaseAgent):
@@ -19,7 +20,7 @@ class DQNAgent(BaseAgent):
         
         # 2. 定义模型构建函数 (适配 ResNet18)
         def model_fn():
-            return ddqn_res18(in_channels=config.FRAME_HISTORY_LEN, num_actions=action_dim)
+            return ddqn_simple(in_channels=config.FRAME_HISTORY_LEN, num_actions=action_dim)
         
         # 3. 实例化框架算法
         self.algorithm = DQN_Algorithm(
@@ -56,6 +57,10 @@ class DQNAgent(BaseAgent):
 
     def save(self, path=None):
         self.algorithm.save(path or self.model_file)
+
+    def save_model(self, path=None):
+        """兼容旧接口：保存模型。"""
+        self.save(path)
 
     def load(self, path=None):
         self.algorithm.load(path or self.model_file)

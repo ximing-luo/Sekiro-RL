@@ -243,13 +243,3 @@ if __name__ == '__main__':
     cap.release()
     cv2.waitKey()
     cv2.destroyAllWindows()
-"""
-模块用途：图像裁剪与指标识别的基础处理方法。
-
-包含：
-- 函数：crop_image, self_blood_count, boss_blood_count, self_stamina_count, boss_stamina_count 等
-
-边界：
-- 负责：图像预处理与指标提取算法
-- 不负责：采集管理、奖励计算、训练逻辑
-"""
