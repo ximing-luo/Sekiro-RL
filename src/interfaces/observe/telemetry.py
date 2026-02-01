@@ -1,6 +1,7 @@
 import pymem
 import threading
 import time
+from collections import deque, Counter
 
 class SekiroTelemetry:
     """
@@ -32,7 +33,11 @@ class SekiroTelemetry:
             "enemy_hp_max": 0,
             "enemy_posture": 0,
             "enemy_posture_max": 0,
+            "player_deaths": 0,
+            "enemy_deaths": 0,
         }
+        # 初始化数据缓冲区，用于平滑处理（取最近10次采样的众数）
+        self._buffers = {key: deque(maxlen=10) for key in self.data.keys()}
         self.running = False
         self.thread = None
         self._initialized = True
@@ -66,20 +71,35 @@ class SekiroTelemetry:
         return 0
 
     def update(self):
-        """刷新当前数据"""
+        """刷新当前数据，并应用 10 次采样众数过滤"""
         if not self.pm or not self.base:
             self._connect()
             if not self.pm or not self.base:
                 return
 
-        self.data["player_hp"] = self._read_r32(0x10)
-        self.data["player_hp_max"] = self._read_r32(0x14)
-        self.data["player_posture"] = self._read_r32(0x18)
-        self.data["player_posture_max"] = self._read_r32(0x1C)
-        self.data["enemy_hp"] = self._read_r32(0x20) # 已在上面过滤处理
-        self.data["enemy_hp_max"] = self._read_r32(0x24)
-        self.data["enemy_posture"] = self._read_r32(0x28)
-        self.data["enemy_posture_max"] = self._read_r32(0x2C)
+        # 1. 批量读取原始数据
+        # 偏移说明：
+        # Python 扫描到 SEKIRO_TLM 签名后的起始位置
+        # SEKIRO_TLM (12字节)
+        # telePlayerHP 紧随其后，开始于 +12
+        raw_values = {
+            "player_hp": self._read_r32(12),
+            "player_hp_max": self._read_r32(16),
+            "player_posture": self._read_r32(24),
+            "player_posture_max": self._read_r32(28),
+            "enemy_hp": self._read_r32(32),
+            "enemy_hp_max": self._read_r32(36),
+            "enemy_posture": self._read_r32(44),
+            "enemy_posture_max": self._read_r32(48),
+            "player_deaths": self._read_r32(52),
+            "enemy_deaths": self._read_r32(56),
+        }
+
+        # 2. 更新缓冲区并计算众数
+        for key, value in raw_values.items():
+            self._buffers[key].append(value)
+            # 取出现次数最多的数值作为当前值
+            self.data[key] = Counter(self._buffers[key]).most_common(1)[0][0]
 
     def _run_loop(self):
         """后台循环刷新数据"""
@@ -107,13 +127,7 @@ class SekiroTelemetry:
         if not self.running:
             self.update()
         
-        return (
-            self.data["player_hp"],
-            self.data["enemy_hp"],
-            self.data["player_posture"],
-            self.data["enemy_posture"],
-            self.data["enemy_posture_max"],
-        )
+        return self.data.copy()
 
 if __name__ == "__main__":
     sek = SekiroTelemetry

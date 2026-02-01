@@ -22,28 +22,35 @@ class RewardManager:
         bb, nbb = prev_tel.get('boss_blood', 0), next_tel.get('boss_blood', 0)
         ss, nss = prev_tel.get('self_stamina', 0), next_tel.get('self_stamina', 0)
         bs, nbs = prev_tel.get('boss_stamina', 0), next_tel.get('boss_stamina', 0)
-
-        if bb - nbb > 1000: nbs = bs
-        bss = prev_tel.get('boss_stamina_max', 0)
+        pd, npd = prev_tel.get('player_deaths', 0), next_tel.get('player_deaths', 0)
+        ed, ned = prev_tel.get('enemy_deaths', 0), next_tel.get('enemy_deaths', 0)
+        sbm = prev_tel.get('self_blood_max', 0)
+        bbm = prev_tel.get('boss_blood_max', 0)
+        ssm = prev_tel.get('self_stamina_max', 0)
+        bsm = prev_tel.get('boss_stamina_max', 0)
+        
         # 0: 自身死亡, 1: Boss死亡, 2: 自身掉血, 3: 自身回血, 4: 自身血量过低, 
         # 5: Boss掉血, 6: 自身架势恶化(数值减小), 7: Boss架势恶化(数值减小), 8: Boss架势过低(可忍杀)
         
-        # 自身死亡：血量瞬间从低位跳变到高位（重生）
-        if sb < 400 and nsb > 600: events.append(0)
-        # Boss死亡：血量归零且架势条重置
-        if nbb == 0 and bb > 0: events.append(1)
+        # 自身死亡：死亡计数增加
+        if npd > pd:
+            events.append(0)
+            print(f"自身死亡检测：死亡计数从 {pd} 增加到 {npd}")
+        # Boss死亡：死亡计数增加
+        if ned > ed:
+            events.append(1)
+            print(f"Boss死亡检测：死亡计数从 {ed} 增加到 {ned}")
+
         # 自身掉血
         if nsb < sb: events.append(2)
-        # 自身血量过低（危险信号）
-        if nsb <= 200: events.append(4)
         # Boss掉血（有效攻击）
         if nbb < bb: events.append(5)
         # 自身架势恶化：只狼架势条是向下扣的，数值减小代表架势条变长/变黄
         if nss < ss: events.append(6)
-        # Boss架势恶化：数值减小代表 Boss 快被破防了
-        if nbs < bs: events.append(7)
-        # 即使数值没变，如果架势条维持在低位（被持续压制），也给一个微弱的持续奖励
-        if nbs < bss - 100: events.append(9)
+        # 自身架势崩溃
+        if ss <= 30 and nss == ssm: events.append(8)
+        # Boss架势变化：数值减小代表 Boss 快被破防了
+        if nbs != bs: events.append(7)
             
         return events
 
