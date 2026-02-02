@@ -19,7 +19,7 @@ if project_root not in sys.path:
 
 from src.interfaces.controls.keyboard import *
 
-fps = 15
+fps = 60
 t = 1/fps
 
 def no_op():
@@ -59,7 +59,7 @@ def F_go():  #钩爪
     time.sleep(t)
     ReleaseKey(Q)
 
-t_go = t * 2
+t_go = t * 6 * 2
 
 def go_forward(): #前进
     PressKey(W)

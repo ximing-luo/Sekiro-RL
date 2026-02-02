@@ -35,19 +35,19 @@ class BasicBlock(nn.Module):
         # 残差主分支（Residual）：
         # - 第1层：3x3 深度卷积（groups=in_channels），按通道独立提取局部特征；stride 控制是否下采样
         # - 第2层：1x1 点卷积，将通道从 in_channels 映射到 out_channels，实现通道混合
-        # - 第3层：BatchNorm2d(out_channels)，做归一化与可学习的缩放/平移
+        # - 第3层：GroupNorm，做归一化与可学习的缩放/平移（替代 BatchNorm 以增强 RL 稳定性）
         # - 第4层：ReLU 激活
         # - 第5层：3x3 深度卷积（groups=out_channels），再次提取局部特征
         # - 第6层：1x1 点卷积，将通道映射到 out_channels * expansion（BasicBlock.expansion=1）
-        # - 第7层：BatchNorm2d(out_channels * expansion)
+        # - 第7层：GroupNorm
         self.residual_function = nn.Sequential(
             nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=stride, groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(min(8, out_channels), out_channels),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, groups=out_channels, padding=1, bias=False),
             nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=1, padding=0, bias=False),
-            nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+            nn.GroupNorm(min(8, out_channels * BasicBlock.expansion), out_channels * BasicBlock.expansion)
         )
 
         # 残差捷径分支（Shortcut）：默认恒等映射（不改变尺寸与通道）
@@ -60,7 +60,7 @@ class BasicBlock(nn.Module):
         if stride != 1 or in_channels != BasicBlock.expansion * out_channels:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels * BasicBlock.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+                nn.GroupNorm(min(8, out_channels * BasicBlock.expansion), out_channels * BasicBlock.expansion)
             )
 
     def forward(self, x):
@@ -79,32 +79,32 @@ class BottleNeck(nn.Module):
             # -- 第一步：压缩 (Reduce) --
             # 第1层：1x1 卷积 - 把高通道压缩到低通道 (out_channels)，就像把宽路缩成窄瓶颈
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(min(8, out_channels), out_channels),
             nn.ReLU(inplace=True),
 
             # -- 第二步：卷积 (Convolution) --
             # 第2层：3x3 深度卷积 + 1x1 点卷积 - 在低维空间做核心特征提取，非常省显存
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, groups=out_channels, padding=1, bias=False),
             nn.Conv2d(out_channels, out_channels, kernel_size=1, padding=0, bias=False),
-            nn.BatchNorm2d(out_channels),
+            nn.GroupNorm(min(8, out_channels), out_channels),
             nn.ReLU(inplace=True),
 
             # -- 第三步：扩张 (Expand) --
             # 第3层：1x1 卷积 - 把通道数暴力弹射起步，变成原来的 4 倍 (BottleNeck.expansion=4)
             nn.Conv2d(out_channels, out_channels* BottleNeck.expansion, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels*BottleNeck.expansion)
+            nn.GroupNorm(min(8, out_channels * BottleNeck.expansion), out_channels * BottleNeck.expansion)
         )
 
         # 捷径分支默认恒等映射
         self.shortcut = nn.Sequential()
 
         # 关键步骤（对应 68-72 行）：
-        # 当需要下采样或通道不匹配时，使用 1x1 卷积 + BN 将捷径分支对齐到
+        # 当需要下采样或通道不匹配时，使用 1x1 卷积 + GroupNorm 将捷径分支对齐到
         # out_channels * expansion 的通道与空间尺寸，确保可相加。
         if stride != 1 or in_channels != out_channels * BottleNeck.expansion:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_channels, out_channels * BottleNeck.expansion, stride=stride, kernel_size=1, bias=False),
-                nn.BatchNorm2d(out_channels * BottleNeck.expansion)
+                nn.GroupNorm(min(8, out_channels * BottleNeck.expansion), out_channels * BottleNeck.expansion)
             )
 
     def forward(self, x):
@@ -121,11 +121,11 @@ class DQN(nn.Module):
         # 输入对齐模块：
         # - 3x3 深度卷积（groups=in_channels）按通道独立提取局部特征（可视为每帧/每色通道的空间处理）
         # - 1x1 点卷积将通道映射到 64，统一后续残差层的输入通道数
-        # - BN + ReLU 稳定训练
+        # - GroupNorm + ReLU 稳定训练
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3,groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=1, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(8, 64),
             nn.ReLU(inplace=True)
         )
 
@@ -177,7 +177,7 @@ class Dueling_DQN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3,groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=1, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            nn.GroupNorm(8, 64),
             nn.ReLU(inplace=True)
         )
 

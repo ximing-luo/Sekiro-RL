@@ -35,23 +35,22 @@ class RewardManager:
         # 自身死亡：死亡计数增加
         if npd > pd:
             events.append(0)
-            print(f"自身死亡检测：死亡计数从 {pd} 增加到 {npd}")
+            print(f"\033[91m自身死亡检测：死亡计数从 {pd} 增加到 {npd}\033[0m")
         # Boss死亡：死亡计数增加
         if ned > ed:
             events.append(1)
-            print(f"Boss死亡检测：死亡计数从 {ed} 增加到 {ned}")
-
+            print(f"\033[91mBoss死亡检测：死亡计数从 {ed} 增加到 {ned}\033[0m")
+        
         # 自身掉血
         if nsb < sb: events.append(2)
         # Boss掉血（有效攻击）
-        if nbb < bb: events.append(5)
+        if nbb != bb: events.append(5)
         # 自身架势恶化：只狼架势条是向下扣的，数值减小代表架势条变长/变黄
-        if nss < ss: events.append(6)
+        if nss != ss: events.append(6)
         # 自身架势崩溃
         if ss <= 30 and nss == ssm: events.append(8)
         # Boss架势变化：数值减小代表 Boss 快被破防了
         if nbs != bs: events.append(7)
-            
         return events
 
     def compute_reward(self, env, prev_metrics, next_metrics, action, events):

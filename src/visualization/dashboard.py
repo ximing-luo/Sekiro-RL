@@ -22,7 +22,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-import configs.config as config
+from configs.config import cfg
 from src.envs.mdp.actions import ACTION_LABELS
 from src.envs.mdp.actions import ACTION_FUNC_MAP, action_count, no_op_index
 try:
@@ -34,7 +34,7 @@ except Exception:
 # 动作短标签来源：date/actions_map.py
 EVENT_LABELS = ['自身死亡','Boss死亡','自身掉血','自身回血','自身血量过低','Boss掉血','自身架势上升','Boss架势上升','Boss架势过低']
 
-LOG_DIR = config.LOG_DIR
+LOG_DIR = cfg.path.log_dir
 JSON_PATH = os.path.join(LOG_DIR, 'latest.json')
 CSV_PATH = os.path.join(LOG_DIR, 'train_metrics.csv')
 

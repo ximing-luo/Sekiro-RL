@@ -17,6 +17,12 @@ ACTION_FUNC_MAP = {
     9: _actions.go_back,
 }
 
+# 动作短标签，用于可视化展示
+ACTION_LABELS = ['无操作', '攻击', '防御', '跳跃', '闪避', '忍义手', '左移', '右移', '前移', '后移']
+
+# 无操作索引定义
+no_op_index = 0
+
 def sekiro_discrete_action(action_index: int, **kwargs):
     """
     基础离散动作映射。
