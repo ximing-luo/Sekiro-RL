@@ -11,7 +11,7 @@ class SceneConfig:
     camera_index: int = 1
     camera_width: int = 1920
     camera_height: int = 1080
-    pos: str = "offscreen"
+    pos: str = "top_left"
 
 @dataclass(frozen=True)
 class UIConfig:

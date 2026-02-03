@@ -3,7 +3,7 @@
 """
 import numpy as np
 from src.interfaces.observe.telemetry import SekiroTelemetry
-from src.envs.manager_based_rl_env import ManagerBasedRLEnv
+from src.envs.base.manager_based_rl_env import ManagerBasedRLEnv
 
 # 初始化遥测单例
 telemetry = SekiroTelemetry()
