@@ -235,8 +235,18 @@ class InputVisRunner:
                             window_utils.move_window("state_t", "top_left")
                             self._window_initialized = True
                         time.sleep(1 / self.fps)
+                elif seq.ndim == 3 and seq.shape[-1] == 3:
+                    # 格式: (H, W, 3) - 单帧 HWC
+                    img = seq
+                    cv2.imshow("state_t", img)
+                    cv2.waitKey(1)
+                    if not self._window_initialized:
+                        window_utils.set_window_topmost("state_t")
+                        window_utils.move_window("state_t", "top_left")
+                        self._window_initialized = True
+                    time.sleep(1 / self.fps)
                 else:
-                    # 格式: (Ck, H, W)
+                    # 格式: (Ck, H, W) - 可能是堆叠帧
                     Ck, H, W = seq.shape
                     k = max(1, Ck // 3)
                     for i in range(k):

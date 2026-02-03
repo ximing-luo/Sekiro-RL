@@ -3,6 +3,7 @@
 """
 import numpy as np
 from src.interfaces.observe.telemetry import SekiroTelemetry
+from src.envs.manager_based_rl_env import ManagerBasedRLEnv
 
 # 初始化遥测单例
 telemetry = SekiroTelemetry()
@@ -24,7 +25,7 @@ def memory_metrics(env, **kwargs):
         'enemy_deaths': metrics["enemy_deaths"]
     }
 
-def image_frame(env, **kwargs):
+def image_frame(env: ManagerBasedRLEnv, **kwargs):
     """获取最新图像帧。"""
     if env.scene_manager:
         return env.scene_manager.get_latest_frame()

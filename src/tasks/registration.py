@@ -39,6 +39,7 @@ class TaskRegistry:
         
         # 3. 实例化环境类
         env = spec.env_class(cfg=cfg)
+        
         return env, cfg
 
     def get_task_names(self):

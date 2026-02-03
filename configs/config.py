@@ -4,8 +4,8 @@ from typing import Tuple
 @dataclass(frozen=True)
 class SceneConfig:
     """基础环境与采集配置。"""
-    img_width: int = 240 # 从 480 降至 240
-    img_height: int = 135 # 从 270 降至 135
+    img_width: int = 480 # 从 480 降至 240
+    img_height: int = 270 # 从 270 降至 135
     capture_fps: int = 60
     target_fps: int = 60
     camera_index: int = 1
@@ -18,7 +18,7 @@ class UIConfig:
     """内存映射与 UI 窗口配置。"""
     blood_window: Tuple[int, int, int, int] = (110, 90, 625, 907)
     stamina_window: Tuple[int, int, int, int] = (586, 54, 750, 900)
-    debug_vis_fps: int = 60
+    debug_vis_fps: int = 0
 
 @dataclass(frozen=True)
 class RLConfig:

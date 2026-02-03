@@ -86,3 +86,52 @@ class SceneManager:
     def stop(self):
         """停止所有资源。"""
         self.stop_debug_visualization()
+        self._frame_capture.stop()
+
+if __name__ == '__main__':
+    # 调试代码：直接运行此类测试采集与可视化
+    import os
+    import sys
+    # 确保能够导入 src
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
+    from configs.config import cfg
+    
+    # 1. 实例化场景管理器
+    manager = SceneManager(
+        observation_w=cfg.scene.img_width,
+        observation_h=cfg.scene.img_height,
+        pos="top_left",
+        capture_fps=cfg.scene.capture_fps
+    )
+    
+    # 2. 启动采集
+    print("正在初始化场景管理器...")
+    manager.setup()
+    
+    # 3. 开启调试可视化 (假设配置中 debug_vis_fps > 0)
+    vis_fps = cfg.ui.debug_vis_fps if cfg.ui.debug_vis_fps > 0 else 30
+    print(f"开启调试可视化，FPS: {vis_fps}")
+    manager.start_debug_visualization(vis_fps)
+    
+    print("开始循环测试，按 Ctrl+C 退出...")
+    try:
+        while True:
+            frame = manager.get_latest_frame()
+            if frame is not None:
+                # 更新可视化数据
+                manager.update_debug_visualization(frame)
+                # 打印一些基本信息
+                if time.time() % 2 < 0.05: # 每2秒打印一次
+                    print(f"当前帧形状: {frame.shape}, 数据范围: [{frame.min()}, {frame.max()}]")
+            else:
+                print("等待帧采集...")
+            
+            time.sleep(1 / vis_fps)
+    except KeyboardInterrupt:
+        print("\n调试被用户中断")
+    finally:
+        manager.stop()
+        print("场景管理器已停止")

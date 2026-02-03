@@ -94,13 +94,18 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self.last_events = list(events)
         self.last_events_feedback = [[name, float(val)] for name, val in components.items()]
         
-        # 6. 写入回放缓冲 (如果开启且观测项中包含 'policy' 图像)
+        # 6. 处理观测值 (如果观测项中包含 'policy' 图像)
         frame = next_metrics.get('policy')
         if frame is not None:
-            # 统一转换为 CHW 格式 (SB3 和 PyTorch 常用)
+            # 调试可视化 (如果开启了 debug_vis_fps)
+            if self.scene_manager:
+                self.scene_manager.update_debug_visualization(frame)
+
+            # 确保 frame 是 CHW 格式用于存储和返回
             if frame.ndim == 3 and frame.shape[-1] == 3:
                 frame = frame.transpose(2, 0, 1)
             
+            # 写入回放缓冲
             if self.replay_buffer is not None:
                 self.replay_buffer.add(frame, action, float(reward), terminated)
             
@@ -128,7 +133,11 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self.last_metrics = self.observation_manager.compute_observations(self)
         frame = self.last_metrics.get('policy')
         if frame is not None:
-            # 统一转换为 CHW 格式
+            # 调试可视化
+            if self.scene_manager:
+                self.scene_manager.update_debug_visualization(frame)
+
+            # 确保 frame 是 CHW 格式
             if frame.ndim == 3 and frame.shape[-1] == 3:
                 frame = frame.transpose(2, 0, 1)
             

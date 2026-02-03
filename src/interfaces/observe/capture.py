@@ -69,7 +69,17 @@ class FrameCapture:
                 pass
 
 if __name__ == '__main__':
+    # 将项目根目录添加到 sys.path
+    import os
+    import sys
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
     # 调试代码：实例化 FrameCapture 并显示画面
+    # 将 src 也加入路径，方便导入
+    src_path = os.path.join(project_root, 'src')
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
     # 默认使用配置中的参数，如果没有配置则手动指定
     try:
         from configs.config import cfg
