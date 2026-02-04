@@ -159,5 +159,5 @@ def move_window(window_title_part, position, strict=False):
         return False
 
 if __name__ == '__main__':
-    move_window("Sekiro", "top_left")
+    move_window("Sekiro", "top_right")
     activate_window_by_title_contains("Sekiro")

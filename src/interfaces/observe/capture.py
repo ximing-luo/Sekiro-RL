@@ -68,6 +68,18 @@ class FrameCapture:
             except Exception:
                 pass
 
+    def __getstate__(self):
+        """序列化保护：排除不可序列化的 cv2.VideoCapture 对象。"""
+        state = self.__dict__.copy()
+        # cap 是底层系统句柄，无法被 pickle
+        state['cap'] = None
+        return state
+
+    def __setstate__(self, state):
+        """反序列化：恢复对象状态并将 cap 初始化为 None。"""
+        self.__dict__.update(state)
+        self.cap = None
+
 if __name__ == '__main__':
     # 将项目根目录添加到 sys.path
     import os

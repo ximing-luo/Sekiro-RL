@@ -13,7 +13,7 @@ class SekiroCombinedCallback(BaseCallback):
     2. 集成卷积层特征图可视化。
     3. 实时特征相似度监控（诊断特征坍缩）。
     """
-    def __init__(self, verbose=0, log_interval=1000):
+    def __init__(self, verbose=0, log_interval=1024):
         super().__init__(verbose)
         self.log_interval = log_interval
         self.hook_manager = None
@@ -41,6 +41,9 @@ class SekiroCombinedCallback(BaseCallback):
         if writer is not None:
             self.hook_manager = TensorboardHookManager(self.model, writer, log_interval=self.log_interval)
             self.hook_manager.register_hooks()
+            
+            # [NOTE] 异常监测钩子由于调试完成，暂时停止注册以提升性能
+            # self.hook_manager.register_anomaly_hooks()
             
             # 建立模型与回调的直接绑定 (握手)，方便 PPO.train 直接调用
             self.model.diagnostics = self
@@ -172,7 +175,7 @@ class SekiroCombinedCallback(BaseCallback):
                         grid[r*target_size[1]:(r+1)*target_size[1], c*target_size[0]:(c+1)*target_size[0]] = img
                     
                     if max_val < 1e-5:
-                        print("  [WARNING] 检测到采样画面全黑（全0）！请检查环境是否正常输出。")
+                        print("[WARNING] 检测到采样画面全黑（全0）！请检查环境是否正常输出。")
                     
                     # 保存到本地根目录供调试
                     cv2.imwrite("debug_experience_grid.png", grid)
@@ -318,6 +321,7 @@ class SekiroCombinedCallback(BaseCallback):
     def _on_training_end(self):
         if self.hook_manager:
             self.hook_manager.remove_hooks()
+            # self.hook_manager.remove_anomaly_hooks()
         
         # 关键：在保存模型前解绑，避免 Pickle 序列化错误
         if hasattr(self.model, "diagnostics"):

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from ..components import RMSNorm, GatedMLP, BottleNeck, SEBlock
+from ..components import RMSNorm, RMSNorm2d, GatedMLP, BottleNeck, SEBlock
 
 class StaticBranch(nn.Module):
     """
@@ -13,13 +13,13 @@ class StaticBranch(nn.Module):
         c = base_channels
         
         self.conv1 = nn.utils.spectral_norm(
-            nn.Conv2d(in_channels, 2, kernel_size=7, stride=2, padding=3, bias=True)
+            nn.Conv2d(in_channels, 2, kernel_size=7, stride=2, padding=3, bias=False)
         )
         self.conv2 = nn.utils.spectral_norm(
-            nn.Conv2d(2, c, kernel_size=5, stride=2, padding=2, bias=True)
+            nn.Conv2d(2, c, kernel_size=5, stride=2, padding=2, bias=False)
         )
         self.act = nn.SiLU(inplace=True)
-        self.norm = RMSNorm(c)
+        self.norm2 = RMSNorm2d(c)
         self.se = SEBlock(c)
         
         self.in_channels = c
@@ -32,6 +32,7 @@ class StaticBranch(nn.Module):
             self._make_layer(c * 32, c * 16, 1, 2),
         )
         
+        self.norm3 = RMSNorm2d(c * 32)
         self.head = nn.Sequential(
             nn.utils.spectral_norm(nn.Conv2d(c * 32, c * 8, kernel_size=1, bias=True)),
             nn.SiLU(inplace=True),
@@ -47,12 +48,13 @@ class StaticBranch(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.act(self.conv2(x))
-        x = self.norm(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+        # 头部架构优化：Conv -> Act -> Norm
+        x = self.act(self.conv1(x))
+        # 直接使用 RMSNorm2d，无需 permute
+        x = self.norm2(self.act(self.conv2(x)))
         x = self.se(x)
         x = self.backbone(x)
-        return self.head(x)
+        return self.head(self.norm3(x))
 
 class DynamicBranch(nn.Module):
     """
@@ -63,14 +65,13 @@ class DynamicBranch(nn.Module):
         c = base_channels
         
         self.conv1 = nn.utils.spectral_norm(
-            nn.Conv2d(in_channels, 2, kernel_size=3, stride=2, padding=1, bias=True)
+            nn.Conv2d(in_channels, 2, kernel_size=3, stride=2, padding=1, bias=False)
         )
-        self.act1 = nn.SiLU(inplace=True)
         self.conv2 = nn.utils.spectral_norm(
-            nn.Conv2d(2, c, kernel_size=5, stride=2, padding=2, bias=True)
+            nn.Conv2d(2, c, kernel_size=5, stride=2, padding=2, bias=False)
         )
-        self.act2 = nn.SiLU(inplace=True)
-        self.norm = RMSNorm(c)
+        self.act = nn.SiLU(inplace=True)
+        self.norm2 = RMSNorm2d(c)
         self.se = SEBlock(c)
         
         self.in_channels = c
@@ -81,6 +82,7 @@ class DynamicBranch(nn.Module):
             self._make_layer(c * 8, c * 64, 2, 2),
         )
         
+        self.norm3 = RMSNorm2d(c * 8)
         self.head = nn.Sequential(
             nn.utils.spectral_norm(nn.Conv2d(c * 8, c * 4, kernel_size=1, bias=True)),
             nn.SiLU(inplace=True),
@@ -96,12 +98,13 @@ class DynamicBranch(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.act1(self.conv1(x))
-        x = self.act2(self.conv2(x))
-        x = self.norm(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+        # 头部架构优化：保持与 StaticBranch 一致
+        x = self.act(self.conv1(x))
+        # 直接使用 RMSNorm2d，无需 permute
+        x = self.norm2(self.act(self.conv2(x)))
         x = self.se(x)
         x = self.backbone(x)
-        return self.head(x)
+        return self.head(self.norm3(x))
 
 class SekiroMADSExtractor(BaseFeaturesExtractor):
     """
@@ -136,16 +139,44 @@ class SekiroMADSExtractor(BaseFeaturesExtractor):
         return 0.299 * rgb[:, 0:1] + 0.587 * rgb[:, 1:2] + 0.114 * rgb[:, 2:3]
 
     def _initialize_weights(self):
-        for m in self.modules():
+        # 使用 named_modules 以便识别 shortcut 分支和输出层
+        for name, m in self.named_modules():
             if isinstance(m, (nn.Conv2d, nn.Linear)):
+                # 捷径分支卷积已在 layers.py 中零初始化，此处跳过以防被覆盖
+                if 'shortcut' in name and isinstance(m, nn.Conv2d):
+                    continue
+
+                # 兼容 Spectral Norm
                 weight = getattr(m, 'weight_orig', m.weight)
-                gain = nn.init.calculate_gain('relu') if isinstance(m, nn.Conv2d) else 1.0
+                
+                # 默认增益
+                gain = 1.0
+                
+                if isinstance(m, nn.Conv2d):
+                    # 主干卷积：使用 ReLU 增益补偿信号损失
+                    gain = nn.init.calculate_gain('relu')
+                elif isinstance(m, nn.Linear):
+                    # 线性层：只有在 GatedMLP 的输出投影或最终层时才缩小增益
+                    if 'down_proj' in name or 'final' in name:
+                        gain = 0.1
+                    else:
+                        gain = 1.0
+                
                 nn.init.orthogonal_(weight, gain=gain)
+                
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        if observations.dtype == torch.uint8:
+        # --- 量纲“石锤”终端诊断 ---
+        with torch.no_grad():
+            obs_max = observations.max().item()
+            if obs_max > 2.0:
+                print(f"\n\033[41;37m[SCALE ALERT] 检测到输入量纲异常!\033[0m")
+                print(f"  > Dtype: {observations.dtype} | Max: {obs_max:.2f} | Min: {observations.min().item():.2f} | Mean: {observations.mean().item():.2f}")
+                print(f"  > 提示: 期望量纲为 [0, 1]，当前可能误传了 [0, 255] 数据。")
+
+        if observations.dtype == torch.uint8 or observations.max().item() > 2:
             observations = observations.float() / 255.0
             
         if observations.shape[1] < 12:
@@ -155,12 +186,25 @@ class SekiroMADSExtractor(BaseFeaturesExtractor):
         if self.training:
             observations = self._random_shift(observations)
             
-        spatial_feat = self.spatial_cnn(observations[:, -3:])
+        # --- 零输入防御 (Static Branch) ---
+        # 如果画面全黑（如加载界面），注入极微弱噪声防止 RMSNorm 梯度爆炸
+        spatial_input = observations[:, -3:]
+        if spatial_input.abs().max() < 1e-6:
+            spatial_input = spatial_input + torch.randn_like(spatial_input) * 1e-5
+            
+        spatial_feat = self.spatial_cnn(spatial_input)
         
         d1 = self._rgb_to_gray(observations[:, 9:12] - observations[:, 6:9])
         d2 = self._rgb_to_gray(observations[:, 6:9] - observations[:, 3:6])
         d3 = self._rgb_to_gray(observations[:, 3:6] - observations[:, 0:3])
         diff_input = torch.cat([d1, d2, d3], dim=1)
+        
+        # --- 零输入防御 ---
+        # 如果画面完全静止，diff_input 会全为 0，这会导致 VICReg 梯度爆炸
+        if diff_input.abs().max() < 1e-6:
+            # 注入极微弱的噪声，确保网络内部的 RMSNorm2d 有有效的输入能量
+            diff_input = diff_input + torch.randn_like(diff_input) * 1e-5
+            
         temporal_feat = self.temporal_cnn(diff_input)
         
         s_distilled = self.spatial_distill(spatial_feat)

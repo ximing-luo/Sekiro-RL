@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .rms import RMSNorm
+from .rms import RMSNorm, RMSNorm2d
 
 class SEBlock(nn.Module):
     """
@@ -47,6 +47,8 @@ class BottleNeck(nn.Module):
             # 1. 投影层: in -> mid (SiLU)
             nn.utils.spectral_norm(nn.Conv2d(in_channels, mid_channels, kernel_size=1, bias=False)),
             nn.SiLU(inplace=True),
+            # 中继归一化：压制由于通道扩张导致的内部数值膨胀
+            RMSNorm2d(mid_channels),
             
             # 2. 空间层: mid -> mid (3x3 Depthwise, SiLU)
             nn.utils.spectral_norm(nn.Conv2d(mid_channels, mid_channels, kernel_size=3, stride=stride, 
@@ -57,28 +59,33 @@ class BottleNeck(nn.Module):
             nn.utils.spectral_norm(nn.Conv2d(mid_channels, out_channels, kernel_size=1, bias=False)),
         )
         
-        # Pre-Norm
-        self.norm = RMSNorm(in_channels)
+        # 残差分支输出归一化 (Post-Norm)
+        # 确保残差路径的输出量纲也被物理锁定在 1.0 附近
+        self.res_norm = RMSNorm2d(out_channels)
         
         # Shortcut 对齐 (ResNet-D 优化版)
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_channels != out_channels:
-            if stride > 1:
-                self.shortcut = nn.Sequential(
-                    nn.AvgPool2d(kernel_size=stride, stride=stride, ceil_mode=True),
-                    nn.utils.spectral_norm(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False))
-                )
-            else:
-                self.shortcut = nn.Sequential(
-                    nn.utils.spectral_norm(nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False))
-                )
+        layers = []
+        if stride > 1:
+            # 空间下采样: 使用 AvgPool 保持平滑
+            layers.append(nn.AvgPool2d(kernel_size=stride, stride=stride, ceil_mode=True))
+
+        if in_channels != out_channels or stride > 1:
+            # 通道投影: 仅在通道不匹配或空间变化时添加 1x1 卷积
+            conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+            # 既然有了 Norm 保护，可以使用标准正交初始化提高初期特征丰富度
+            nn.init.orthogonal_(conv.weight, gain=1.0)
+            layers.append(conv)
+            # 物理断路器：在捷径末端强制量纲回归
+            layers.append(RMSNorm2d(out_channels))
+
+        self.shortcut = nn.Sequential(*layers)
 
     def forward(self, x):
         identity = self.shortcut(x)
-        # 仅对分支信号归一化，主干保持纯净
-        # 处理 (B, C, H, W) 格式，RMSNorm 期望最后一个维度是特征维
-        out = self.norm(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
-        out = self.residual_function(out)
+        # 核心改进：双路径输出归一化
+        # 1. 计算残差分支并立即归一化
+        out = self.res_norm(self.residual_function(x))
+        # 2. 与同样归一化过的捷径分支相加 (1.0 + 1.0 ≈ 2.0)
         return out + identity
 
 class InitialFrameConv(nn.Module):

@@ -7,106 +7,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer
 from stable_baselines3.common.utils import explained_variance, get_schedule_fn
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule, RolloutBufferSamples
-
-class SekiroRolloutBufferSamples(NamedTuple):
-    observations: torch.Tensor
-    actions: torch.Tensor
-    old_values: torch.Tensor
-    old_log_prob: torch.Tensor
-    advantages: torch.Tensor
-    returns: torch.Tensor
-    next_observations: torch.Tensor # 新增：用于逆动力学损失
-
-class SekiroRolloutBuffer(RolloutBuffer):
-    """
-    显存优化型 RolloutBuffer：
-    1. 内部只存储单帧图像，采样时动态堆叠。
-    2. 支持存储 next_observations 用于辅助任务。
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 显存优化：修改 observations 的形状为单帧 (3, H, W)
-        # 注意：基类 __init__ 已经分配了空间，我们需要重新分配
-        self.obs_shape = (3, self.obs_shape[1], self.obs_shape[2])
-        self.observations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.uint8)
-        # 增加 next_observations 存储
-        self.next_observations = np.zeros((self.buffer_size, self.n_envs, *self.obs_shape), dtype=np.uint8)
-
-    def add(self, obs, action, reward, episode_start, value, log_prob, next_obs=None):
-        """扩展 add 方法，支持传入 next_obs"""
-        if next_obs is not None:
-            # 同样需要处理 next_obs 的通道切片
-            if next_obs.ndim == 3 and next_obs.shape[0] > 3:
-                next_obs = next_obs[-3:]
-            elif next_obs.ndim == 4 and next_obs.shape[1] > 3:
-                next_obs = next_obs[:, -3:]
-            self.next_observations[self.pos] = np.array(next_obs).copy()
-        
-        # 确保只存单帧（针对 VecEnv 自动堆叠的情况进行降维）
-        # 如果维度是 (C, H, W) 且 C > 3 (单环境堆叠)
-        if obs.ndim == 3 and obs.shape[0] > 3:
-            obs = obs[-3:]
-        # 如果维度是 (N, C, H, W) 且 C > 3 (多环境堆叠)
-        elif obs.ndim == 4 and obs.shape[1] > 3:
-            obs = obs[:, -3:]
-            
-        super().add(obs, action, reward, episode_start, value, log_prob)
-
-    def get(self, batch_size: Optional[int] = None) -> Generator[SekiroRolloutBufferSamples, None, None]:
-        indices = np.random.permutation(self.buffer_size * self.n_envs)
-        
-        for start_idx in range(0, self.buffer_size * self.n_envs, batch_size):
-            yield self._get_samples(indices[start_idx : start_idx + batch_size])
-
-    def _get_samples(self, batch_indices: np.ndarray, env: Optional[GymEnv] = None) -> SekiroRolloutBufferSamples:
-        """动态构建堆叠帧"""
-        n_stack, skip = 4, 3
-        
-        # 提取基础数据
-        obs_batch = []
-        next_obs_batch = []
-        
-        for idx in batch_indices:
-            step_idx = idx // self.n_envs
-            env_idx = idx % self.n_envs
-            
-            # 1. 构建当前观测的堆叠帧 (s_t)
-            stacked_obs = self._stack_frames(step_idx, env_idx, self.observations, n_stack, skip)
-            obs_batch.append(stacked_obs)
-            
-            # 2. 构建下一帧观测的堆叠帧 (s_{t+1})
-            # 逆动力学需要 z_t 和 z_{t+1}
-            # z_{t+1} 的堆叠帧由 [s_{t-6}, s_{t-3}, s_t, s_{t+1}] 组成
-            # 这里简化处理：直接使用 next_observations 替换掉堆叠中的最后一帧
-            stacked_next_obs = self._stack_frames(step_idx, env_idx, self.observations, n_stack - 1, skip)
-            # 拼接最新的下一帧
-            current_next_obs = self.next_observations[step_idx, env_idx]
-            stacked_next_obs = np.concatenate([stacked_next_obs, current_next_obs], axis=0)
-            next_obs_batch.append(stacked_next_obs)
-
-        # 转换为 Tensor
-        data = (
-            self.to_torch(np.stack(obs_batch)),
-            self.to_torch(self.actions[batch_indices // self.n_envs, batch_indices % self.n_envs]),
-            self.to_torch(self.values[batch_indices // self.n_envs, batch_indices % self.n_envs].flatten()),
-            self.to_torch(self.log_probs[batch_indices // self.n_envs, batch_indices % self.n_envs].flatten()),
-            self.to_torch(self.advantages[batch_indices // self.n_envs, batch_indices % self.n_envs].flatten()),
-            self.to_torch(self.returns[batch_indices // self.n_envs, batch_indices % self.n_envs].flatten()),
-            self.to_torch(np.stack(next_obs_batch))
-        )
-        return SekiroRolloutBufferSamples(*data)
-
-    def _stack_frames(self, step_idx, env_idx, buffer_array, n_stack, skip):
-        """辅助方法：从缓冲区提取单帧并拼接"""
-        frames = []
-        for i in range(n_stack):
-            # 目标索引：当前步减去跳帧偏移
-            target_idx = step_idx - (n_stack - 1 - i) * skip
-            # 处理边界：如果索引小于 0，则重复第一帧
-            if target_idx < 0:
-                target_idx = 0
-            frames.append(buffer_array[target_idx, env_idx])
-        return np.concatenate(frames, axis=0)
+from .buffer import SekiroRolloutBuffer
 
 class SekiroPPO(PPO):
     """
@@ -229,7 +130,13 @@ class SekiroPPO(PPO):
                 
                 actions, values, log_probs = self.policy(obs_tensor)
             
+            # 显存优化：将张量从 GPU 转移到 CPU 并脱离计算图
+            # 必须保持为 Tensor 类型，因为 SB3 的 RolloutBuffer.add 会调用 .clone()
+            # 否则会报 AttributeError: 'numpy.ndarray' object has no attribute 'clone'
             actions = actions.cpu().numpy()
+            values = values.flatten().detach().cpu()
+            log_probs = log_probs.flatten().detach().cpu()
+
             new_obs, rewards, dones, infos = env.step(actions)
 
             self.num_timesteps += env.num_envs
@@ -283,24 +190,43 @@ class SekiroPPO(PPO):
         # 用于记录平均 Loss
         pg_losses, value_losses, vicreg_losses, inv_dyn_losses = [], [], [], []
 
+        # 进度监控初始化
+        n_batches = (self.n_steps * self.n_envs) // self.batch_size
+        total_iters = self.n_epochs * n_batches
+        current_iter = 0
+        print(f"\033[94m[TRAIN] 开始执行反向传播: {self.n_epochs} Epochs | {n_batches} Batches/Epoch | 总计 {total_iters} 次更新\033[0m")
+
+        # --- 反向传播开始前：停止 SceneManager 采集以节省 GPU 资源 ---
+        try:
+            # 尝试通过 get_attr 获取 VecEnv 中的 scene_manager
+            scene_managers = self.env.get_attr("scene_manager")
+            if scene_managers and scene_managers[0] is not None:
+                scene_managers[0].stop()
+                print("\033[93m[INFO] 已停止 SceneManager 采集预览以节省 GPU 资源\033[0m")
+        except (AttributeError, IndexError):
+            # 如果失败，尝试直接访问 (针对非 VecEnv)
+            if hasattr(self.env, "scene_manager"):
+                self.env.scene_manager.stop()
+                print("\033[93m[INFO] 已停止 SceneManager 采集预览以节省 GPU 资源\033[0m")
+
         for epoch in range(self.n_epochs):
-            # 每一轮 epoch 都打乱一次 buffer 数据
+            # --- 显存预警与优化 ---
+            # 每一轮 epoch 都打乱一次 buffer 数据并分批加载。
+            # 注意：这里的 self.batch_size 是 mini-batch 大小。
+            # 对于 12 通道图像 (12, 135, 240)，单样本约 0.37MB (float32)。
+            # batch_size=256 时，obs + next_obs 占用约 190MB 显存。
+            # batch_size=4096 时，将直接占用约 3GB 显存，加上中间激活值极易爆显存。
             for rollout_data in self.rollout_buffer.get(self.batch_size):
                 actions = rollout_data.actions.long().flatten()
                 
-                # --- 0. 显式归一化与数值保护 ---
+                # --- 0. 数值安全检查 ---
                 observations = rollout_data.observations
-                if observations.dtype == torch.uint8:
-                    observations = observations.float() / 255.0
-                
                 next_observations = rollout_data.next_observations
-                if next_observations.dtype == torch.uint8:
-                    next_observations = next_observations.float() / 255.0
                 
                 # --- 1. 核心前向传播 (优化版：CNN 仅运行一次) ---
                 # 提取特征
                 features = self.policy.features_extractor(observations)
-                
+
                 # 获取策略和价值分布 (复用 features)
                 latent_pi, latent_vf = self.policy.mlp_extractor(features)
                 distribution = self.policy._get_action_dist_from_latent(latent_pi)
@@ -309,15 +235,21 @@ class SekiroPPO(PPO):
                 entropy = distribution.entropy()
                 
                 # --- 2. 辅助任务：VICReg Variance Loss ---
-                # 强制每个特征维度的标准差保持在一定水平，防止坍缩
-                std_features = torch.sqrt(features.var(dim=0) + 1e-04)
+                # 强化版：防止由于特征塌缩导致的梯度奇点
+                # 1. 注入极小噪声破坏全零状态
+                safe_features = features + torch.randn_like(features) * 1e-6
+                # 2. 提升 eps 保护，确保反向传播导数不爆炸
+                std_features = torch.sqrt(safe_features.var(dim=0) + 1e-03)
+                # 3. 计算 Loss 并应用上界裁剪
                 vicreg_loss = torch.mean(F.relu(1.0 - std_features))
+                vicreg_loss = torch.clamp(vicreg_loss, max=10.0)
 
                 # --- 3. 辅助任务：Inverse Dynamics Loss ---
                 # 预测动作：根据 z_t 和 z_{t+1} 预测 a_t
                 next_features = self.policy.features_extractor(next_observations)
                 pred_actions = self.inv_dyn_head(torch.cat([features, next_features], dim=1))
-                inv_dynamics_loss = F.cross_entropy(pred_actions, actions)
+                # 引入 label_smoothing 以增加分类损失的鲁棒性
+                inv_dynamics_loss = F.cross_entropy(pred_actions, actions, label_smoothing=0.1)
                 
                 # --- 4. PPO 主损失计算 ---
                 advantages = rollout_data.advantages
@@ -368,21 +300,56 @@ class SekiroPPO(PPO):
                     + self.inv_dyn_coef * inv_dynamics_loss
                 )
 
+                # Loss 异常监测 (石锤 3)
+                if loss.item() > 1000.0 or torch.isnan(loss):
+                    print(f"\n\033[91;1m[LOSS WATCHDOG] 检测到异常 Loss! Step: {self._train_step_count}\033[0m")
+                    print(f"  > Total Loss: {loss.item():.4f}")
+                    print(f"  > Policy Loss: {policy_loss.item():.4f}")
+                    print(f"  > Value Loss: {value_loss.item():.4f}")
+                    print(f"  > VICReg Loss: {vicreg_loss.item():.4f}")
+                    print(f"  > InvDyn Loss: {inv_dynamics_loss.item():.4f}")
+                    if torch.isnan(loss):
+                        raise RuntimeError("Loss 变为 NaN")
+
                 # 优化步骤
                 self.policy.optimizer.zero_grad()
-                loss.backward()
+                try:
+                    loss.backward()
+                except RuntimeError as e:
+                    if "NaN" in str(e):
+                        print("\033[91m[FATAL] Backward 传播过程中产生 NaN!\033[0m")
+                        print(f"Loss 状态: Policy={policy_loss.item():.4f}, Value={value_loss.item():.4f}, "
+                              f"VICReg={vicreg_loss.item():.4f}, InvDyn={inv_dynamics_loss.item():.4f}")
+                    raise e
                 
-                # --- 诊断：通过绑定在模型上的 diagnostics 直接记录 ---
-                if hasattr(self, "diagnostics"):
-                    self.diagnostics.log_gradients(step=self._train_step_count)
+                # --- 诊断：调试完成后不再频繁检查梯度与权重以提升性能 ---
+                # if hasattr(self, "diagnostics"):
+                #     try:
+                #         self.diagnostics.log_gradients(step=self._train_step_count)
+                #     except RuntimeError as e:
+                #         # 记录导致 NaN 的具体 Loss 项 (石锤 2)
+                #         print(f"\033[91m[FATAL] 梯度爆炸触发时 Loss 状态:\033[0m")
+                #         print(f"  > policy_loss: {policy_loss.item():.6f}")
+                #         print(f"  > value_loss:  {value_loss.item():.6f}")
+                #         print(f"  > vicreg_loss: {vicreg_loss.item():.6f}")
+                #         print(f"  > inv_dyn_loss: {inv_dynamics_loss.item():.6f}")
+                #         raise e
                 
                 # 梯度裁剪
                 torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
                 
-                # --- 诊断：记录更新后的权重 ---
-                if hasattr(self, "diagnostics"):
-                    self.diagnostics.log_weights(step=self._train_step_count)
+                # --- 进度实时刷新 ---
+                current_iter += 1
+                progress = current_iter / total_iters
+                bar_len = 20
+                filled_len = int(bar_len * progress)
+                bar = '█' * filled_len + '-' * (bar_len - filled_len)
+                print(f"\n\033[96m  进度: |{bar}| {progress:6.1%} | Epoch: {epoch+1}/{self.n_epochs} | Loss: {loss.item():.4f}\033[0m", end="")
+                
+                # --- 诊断：记录更新后的权重 (已停止) ---
+                # if hasattr(self, "diagnostics"):
+                #     self.diagnostics.log_weights(step=self._train_step_count)
                 
                 self._train_step_count += 1
 
@@ -393,9 +360,29 @@ class SekiroPPO(PPO):
                 inv_dyn_losses.append(inv_dynamics_loss.item())
 
                 # 显存清理：手动释放大张量引用，帮助垃圾回收
+                # 注意：如果 batch_size 过大 (如 4096)，observations 可能会占用极高显存 (约 10GB+)
+                # 建议将 batch_size 设置为 256 或 512，并通过 n_epochs 调节更新强度
                 del observations, next_observations, features, next_features, latent_pi, latent_vf, distribution
-                del policy_loss, value_loss, vicreg_loss, inv_dynamics_loss, loss
+                del policy_loss, value_loss, vicreg_loss, inv_dynamics_loss, loss, rollout_data
+                
+                # 每 10 个 Batch 尝试清理一次显存碎片 (可选)
+                if current_iter % 10 == 0:
+                    torch.cuda.empty_cache()
 
+        # --- 反向传播完成后：恢复 SceneManager 采集 ---
+        try:
+            # 尝试通过 get_attr 获取 VecEnv 中的 scene_manager
+            scene_managers = self.env.get_attr("scene_manager")
+            if scene_managers and scene_managers[0] is not None:
+                scene_managers[0].setup()
+                print("\n\033[92m[INFO] 已恢复 SceneManager 采集预览\033[0m")
+        except (AttributeError, IndexError):
+            # 如果失败，尝试直接访问 (针对非 VecEnv)
+            if hasattr(self.env, "scene_manager"):
+                self.env.scene_manager.setup()
+                print("\n\033[92m[INFO] 已恢复 SceneManager 采集预览\033[0m")
+
+        print("\n\033[92m[TRAIN] 反向传播训练完成。\033[0m")
         self._n_updates += self.n_epochs
         explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
 

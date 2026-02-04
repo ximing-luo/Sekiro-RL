@@ -9,7 +9,7 @@ class SceneManager:
     场景管理器：负责窗口控制、图像采集线程管理以及游戏暂停/恢复逻辑。
     对应 Isaac Lab 中的 Scene 概念，但针对 Sekiro 进行了适配。
     """
-    def __init__(self, observation_w, observation_h, pos="top_left", capture_fps=60):
+    def __init__(self, observation_w, observation_h, pos="top_right", capture_fps=60):
         self.width = observation_w
         self.height = observation_h
         self.capture_fps = capture_fps
@@ -87,6 +87,18 @@ class SceneManager:
         """停止所有资源。"""
         self.stop_debug_visualization()
         self._frame_capture.stop()
+
+    def __getstate__(self):
+        """序列化保护：排除不可序列化的可视化线程对象。"""
+        state = self.__dict__.copy()
+        # 可视化运行器包含线程，无法被 pickle
+        state['_input_vis_runner'] = None
+        return state
+
+    def __setstate__(self, state):
+        """反序列化：恢复状态。"""
+        self.__dict__.update(state)
+        self._input_vis_runner = None
 
 if __name__ == '__main__':
     # 调试代码：直接运行此类测试采集与可视化

@@ -15,7 +15,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     scene: SceneCfg = field(default_factory=lambda: SceneCfg(
         observation_w=config.cfg.scene.img_width,
         observation_h=config.cfg.scene.img_height,
-        pos="top_left",
+        pos=config.cfg.scene.pos,
         capture_fps=config.cfg.scene.capture_fps,
         debug_vis_fps=config.cfg.ui.debug_vis_fps
     ))

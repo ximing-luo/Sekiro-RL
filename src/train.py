@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument("--save_freq", type=int, default=10000, help="模型保存频率 (steps)")
     parser.add_argument("--lr", type=float, default=3e-4, help="学习率")
     parser.add_argument("--batch_size", type=int, default=16, help="批大小")
-    parser.add_argument("--n_steps", type=int, default=64, help="PPO 采集步数")
+    parser.add_argument("--n_steps", type=int, default=128, help="PPO 采集步数")
     parser.add_argument("--checkpoint", type=str, default='None', help="断点模型路径")
     return parser.parse_args()
 
@@ -49,7 +49,7 @@ def get_model(args, env, policy_kwargs):
     print("未指定有效断点，正在初始化新模型...")
     return SekiroPPO(SekiroCustomPolicy, env, policy_kwargs=policy_kwargs,
                     learning_rate=args.lr, n_steps=args.n_steps, batch_size=args.batch_size,
-                    n_epochs=2, ent_coef=0.01, clip_range=0.2, max_grad_norm=0.5,
+                    n_epochs=5, ent_coef=0.01, clip_range=0.2, max_grad_norm=0.5,
                     verbose=1, device=device, vicreg_coef=1.0, inv_dyn_coef=0.1,
                     vf_coef=0.2, clip_range_vf=0.2)
 
@@ -58,25 +58,25 @@ def main():
     print(f"正在启动任务: {args.task}")
     env, _ = task_registry.make(args.task)
     
-    # 2. 配置神经网络架构 (MADS 双流提取器)
+    # 配置神经网络架构 (MADS 双流提取器)
     policy_kwargs = dict(
         features_extractor_class=SekiroMADSExtractor,
         features_extractor_kwargs=dict(features_dim=512),
         net_arch=dict(pi=[512, 256], vf=[512, 256])
     )
 
-    # 3. 初始化 PPO 模型与日志系统
+    # 初始化 PPO 模型与日志系统
     print(f"训练设备: {'CUDA' if torch.cuda.is_available() else 'CPU'}")
     model = get_model(args, env, policy_kwargs)
     model.set_logger(setup_logger(config.cfg.path.log_dir))
 
-    # 4. 配置自动保存与可视化回调
+    # 配置自动保存与可视化回调
     callbacks = [
         CheckpointCallback(save_freq=args.save_freq, save_path="./models/ppo_checkpoints/", name_prefix="sekiro_ppo"),
-        SekiroCombinedCallback(log_interval=1000)
+        SekiroCombinedCallback(log_interval=64)
     ]
 
-    # 5. 开始训练
+    # 开始训练
     print(f"训练开始。Tensorboard 日志目录: {config.cfg.path.log_dir}")
     try:
         model.learn(total_timesteps=args.steps, callback=callbacks, progress_bar=True)
