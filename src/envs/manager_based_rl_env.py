@@ -81,6 +81,12 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         if self.last_metrics is None:
             self.last_metrics = next_metrics
 
+        # 2.5 更新可视化 (如果有开启)
+        frame = next_metrics.get('policy')
+        if frame is not None:
+            # 这里的 frame 已经是 transpose 之前的 HWC 格式，适合 CV2 显示
+            self.scene_manager.update_debug_visualization(frame)
+
         # 3. 检测事件并计算奖励
         events = self.reward_manager.detect_events(self.last_metrics, next_metrics)
         reward, components = self.reward_manager.compute_reward(self, self.last_metrics, next_metrics, action, events)

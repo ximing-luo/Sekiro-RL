@@ -50,7 +50,8 @@ class FrameCapture:
 
                 # 核心代码逻辑：读取帧、缩放、更新最新帧
                 observe_resize = cv2.resize(observe, (self.target_width, self.target_height), interpolation=cv2.INTER_AREA)
-                self.latest_frame = np.array(observe_resize).reshape(self.target_height, self.target_width, 3)
+                # 确保是 HWC 格式的 numpy 数组，且内存连续
+                self.latest_frame = np.ascontiguousarray(observe_resize)
 
                 if period > 0.0:
                     dt = time.time() - t0

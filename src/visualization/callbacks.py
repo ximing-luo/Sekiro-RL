@@ -1,5 +1,8 @@
 import torch
 import torch.nn.functional as F
+import cv2
+import numpy as np
+import os
 from stable_baselines3.common.callbacks import BaseCallback
 from src.envs.mdp.actions import ACTION_LABELS
 from src.visualization.tensorboard_utils import TensorboardHookManager
@@ -36,9 +39,9 @@ class SekiroCombinedCallback(BaseCallback):
                 writer = output_format.writer
                 break
         
-        if writer is not None:
-            self.hook_manager = TensorboardHookManager(self.model, writer, log_interval=self.log_interval)
-            self.hook_manager.register_hooks()
+        # if writer is not None:
+        #     self.hook_manager = TensorboardHookManager(self.model, writer, log_interval=self.log_interval)
+        #     self.hook_manager.register_hooks()
 
     def _on_step(self) -> bool:
         # 1. 从 infos 提取奖励分量
@@ -61,8 +64,8 @@ class SekiroCombinedCallback(BaseCallback):
         return True
 
     def _on_rollout_start(self):
-        """每轮 Rollout 开始前（即模型更新后）运行诊断。"""
-        self._analyze_feature_similarity()
+        """每轮 Rollout 开始前。"""
+        pass
 
     def _analyze_feature_similarity(self):
         """计算特征提取器对不同输入的敏感度（余弦相似度）。"""
@@ -99,26 +102,50 @@ class SekiroCombinedCallback(BaseCallback):
                 idx = torch.randperm(flat_obs.size(0))[:num_samples]
                 exp_samples = flat_obs[idx].to(device)
                 
+                # --- 调试：保存采样的 8 张图到根目录 ---
+                self._save_debug_images(exp_samples)
+                
                 # 确保归一化 (如果是 uint8)
                 if exp_samples.dtype == torch.uint8:
                     exp_samples = exp_samples.float() / 255.0
                 
                 exp_feats = extractor(exp_samples) # (num_samples, features_dim)
                 
-                exp_sims = []
-                for i in range(num_samples):
-                    for j in range(i + 1, num_samples):
-                        sim = F.cosine_similarity(exp_feats[i:i+1], exp_feats[j:j+1]).item()
-                        exp_sims.append(sim)
+                # 优化相似度计算：使用矩阵运算，更高效且不容易出错
+                norm_exp_feats = F.normalize(exp_feats, dim=1)
+                sim_matrix = torch.matmul(norm_exp_feats, norm_exp_feats.T)
+                n = exp_feats.size(0)
+                mask = torch.eye(n, device=device).bool()
+                exp_sims = sim_matrix[~mask]
                 
-                if exp_sims:
-                    self.last_sim_metrics["experience_avg"] = sum(exp_sims) / len(exp_sims)
+                if exp_sims.numel() > 0:
+                    self.last_sim_metrics["experience_avg"] = exp_sims.mean().item()
             
         extractor.train()
 
+    def _save_debug_images(self, samples):
+        """将采样张量保存为本地图片。"""
+        # 确保目录存在
+        debug_dir = "debug_samples"
+        if not os.path.exists(debug_dir):
+            os.makedirs(debug_dir)
+            
+        for i, img_tensor in enumerate(samples):
+            # (C, H, W) -> (H, W, C)
+            img_np = img_tensor.cpu().numpy().transpose(1, 2, 0)
+            # 如果是 float 0-1，转回 0-255
+            if img_np.dtype != np.uint8:
+                img_np = (img_np * 255).astype(np.uint8)
+            # RGB -> BGR (OpenCV)
+            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(os.path.join(debug_dir, f"sample_{i}.png"), img_bgr)
+
     def _on_rollout_end(self):
         self.iteration += 1
-        print(f"\n[Step {self.num_timesteps}] 采集完成，正在开始反向传播训练...")
+        print(f"\n[Step {self.num_timesteps}] 采集完成，正在运行诊断并开始训练...")
+        
+        # 0. 运行特征相似度诊断 (此时 rollout_buffer 已满，数据最全)
+        self._analyze_feature_similarity()
         
         # 1. 记录动作分布直方图到 TensorBoard
         self._log_action_distribution()

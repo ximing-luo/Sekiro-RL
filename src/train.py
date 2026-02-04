@@ -17,6 +17,7 @@ import src.interfaces.system.window as window_utils
 from src.tasks.registration import task_registry
 import src.tasks.sekiro  # 触发注册
 import configs.config as config
+from src.model.ppo_aux import AuxPPO
 from src.envs.mdp.actions import ACTION_LABELS
 from src.model.ppo_models import SekiroStableExtractor
 from src.visualization.callbacks import SekiroCombinedCallback
@@ -26,9 +27,10 @@ def main():
     parser.add_argument("--task", type=str, default="Sekiro-v0", help="要训练的任务 ID")
     parser.add_argument("--steps", type=int, default=100000, help="总训练时间步数")
     parser.add_argument("--save_freq", type=int, default=10000, help="模型保存频率 (steps)")
-    parser.add_argument("--lr", type=float, default=5e-5, help="降低学习率以稳定高奖励环境 (原 3e-4)")
+    parser.add_argument("--lr", type=float, default=3e-4, help="降低学习率以稳定高奖励环境 (原 3e-4)")
     parser.add_argument("--batch_size", type=int, default=128, help="批大小 (减小以节省显存)")
-    parser.add_argument("--n_steps", type=int, default=512, help="PPO 采集步数 (减小以减少单次 Rollout 内存占用)")
+    parser.add_argument("--n_steps", type=int, default=2048, help="PPO 采集步数 (减小以减少单次 Rollout 内存占用)")
+    parser.add_argument("--aux_coef", type=float, default=0.1, help="特征余弦相似度辅助损失权重")
     parser.add_argument("--checkpoint", type=str, default='None', help="断点模型路径 (例如 models/ppo_checkpoints/sekiro_ppo_10000_steps.zip)")
     
     args = parser.parse_args()
@@ -59,19 +61,20 @@ def main():
     
     if args.checkpoint and os.path.exists(args.checkpoint):
         print(f"正在从断点加载模型: {args.checkpoint}")
-        model = PPO.load(
+        model = AuxPPO.load(
             args.checkpoint, 
             env=env, 
             device="cuda" if torch.cuda.is_available() else "cpu",
             custom_objects={
                 "learning_rate": args.lr,
                 "n_steps": args.n_steps,
-                "batch_size": args.batch_size
+                "batch_size": args.batch_size,
+                "aux_coef": args.aux_coef
             }
         )
     else:
         print("未指定有效断点，正在初始化新模型...")
-        model = PPO(
+        model = AuxPPO(
             "CnnPolicy", 
             env, 
             policy_kwargs=policy_kwargs,
@@ -82,6 +85,7 @@ def main():
             ent_coef=0.01, # 增加熵系数，强迫模型探索，防止死锁在“左移”等单一动作
             clip_range=0.2, # 限制策略更新幅度
             max_grad_norm=0.5, # 显式开启梯度裁剪，防止第一轮更新干爆模型
+            aux_coef=args.aux_coef,
             verbose=1,
             device="cuda" if torch.cuda.is_available() else "cpu"
         )

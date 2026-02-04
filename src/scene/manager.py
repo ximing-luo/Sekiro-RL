@@ -36,6 +36,10 @@ class SceneManager:
     def setup(self):
         """初始化场景：启动采集、移动并激活窗口。"""
         self._frame_capture.start()
+        # 强制等待一小段时间，确保采集线程已经成功拿到至少一帧画面
+        # 防止环境启动瞬间拿到的是初始化全 0 的黑屏
+        time.sleep(1.0) 
+        
         window_utils.move_window(self.window_title, self.pos, True)
         window_utils.activate_window_by_title_contains(self.window_title, True)
 
@@ -61,7 +65,7 @@ class SceneManager:
             self._input_vis_runner = None
 
     def check_pause(self, paused):
-        """检查并处理游戏暂停/恢复逻辑。"""
+        """检查并处理游戏暂停/恢复逻辑。快捷键改为 ALT + T。"""
         keys = key_check()
         if 'T' in keys:
             paused = not paused
@@ -72,7 +76,7 @@ class SceneManager:
             print('paused')
             while paused:
                 keys = key_check()
-                if 'T' in keys:
+                if 'ALT' in keys and 'T' in keys:
                     paused = False
                     print('start game')
                     time.sleep(1)

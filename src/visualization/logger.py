@@ -235,23 +235,34 @@ class InputVisRunner:
                             window_utils.move_window("state_t", "top_left")
                             self._window_initialized = True
                         time.sleep(1 / self.fps)
-                else:
-                    # 格式: (Ck, H, W)
-                    Ck, H, W = seq.shape
-                    k = max(1, Ck // 3)
-                    for i in range(k):
-                        if self._stop_event.is_set():
-                            break
-                        frame_chw = seq[3 * i: 3 * (i + 1), :, :]
-                        img = np.transpose(frame_chw, (1, 2, 0))
+                elif seq.ndim == 3:
+                    if seq.shape[-1] == 3:
+                        # 格式: (H, W, 3) - 单帧 HWC
+                        img = seq
                         cv2.imshow("state_t", img)
                         cv2.waitKey(1)
-                        # 步骤 3：首次初始化窗口位置与置顶
                         if not self._window_initialized:
                             window_utils.set_window_topmost("state_t")
                             window_utils.move_window("state_t", "top_left")
                             self._window_initialized = True
                         time.sleep(1 / self.fps)
+                    else:
+                        # 格式: (Ck, H, W) - 堆叠 CHW
+                        Ck, H, W = seq.shape
+                        k = max(1, Ck // 3)
+                        for i in range(k):
+                            if self._stop_event.is_set():
+                                break
+                            frame_chw = seq[3 * i: 3 * (i + 1), :, :]
+                            img = np.transpose(frame_chw, (1, 2, 0))
+                            cv2.imshow("state_t", img)
+                            cv2.waitKey(1)
+                            # 步骤 3：首次初始化窗口位置与置顶
+                            if not self._window_initialized:
+                                window_utils.set_window_topmost("state_t")
+                                window_utils.move_window("state_t", "top_left")
+                                self._window_initialized = True
+                            time.sleep(1 / self.fps)
         # 步骤 2：在线程中启动显示循环
         t = threading.Thread(target=display_loop, daemon=True)
         t.start()
