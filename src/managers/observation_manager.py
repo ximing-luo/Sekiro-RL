@@ -15,3 +15,7 @@ class ObservationManager:
             val = term_cfg.func(env=env, **term_cfg.params)
             observations[name] = val
         return observations
+
+    def reset(self):
+        """重置管理器状态（如果有）。"""
+        pass

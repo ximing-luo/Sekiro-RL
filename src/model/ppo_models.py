@@ -3,6 +3,30 @@ import torch.nn as nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from .resnet import BasicBlock, BottleNeck
 
+class SEBlock(nn.Module):
+    """
+    Squeeze-and-Excitation Block (通道注意力机制)
+    通过全局平均池化捕捉通道间的全局统计信息，学习通道重要性权重。
+    """
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.SiLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        # 1. Squeeze: (B, C, H, W) -> (B, C)
+        y = self.avg_pool(x).view(b, c)
+        # 2. Excitation: (B, C) -> (B, C, 1, 1)
+        y = self.fc(y).view(b, c, 1, 1)
+        # 3. Reweight
+        return x * y.expand_as(x)
+
 class SekiroStableExtractor(BaseFeaturesExtractor):
     """
     更稳定的卷积神经网络特征提取器。
@@ -21,11 +45,12 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
         self.in_channels = 32
         
         # 1. 输入模块：降低下采样攻击性，保留更多空间细节
+        # 引入谱归一化和 SEBlock 增强特征提取的辨识度
         # 图像：240x135 -> 120x68
         self.conv1 = nn.Sequential(
-            nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=2, padding=1, bias=False),
-            nn.GroupNorm(8, 32),
-            nn.ReLU(inplace=True)
+            nn.utils.spectral_norm(nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=2, padding=1, bias=False)),
+            SEBlock(32),
+            nn.SiLU(inplace=True)
         )
         
         # 2. 残差层阶段 (使用 BasicBlock)
@@ -41,7 +66,7 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
         self.bottleneck = nn.Sequential(
             nn.Conv2d(256 * BasicBlock.expansion, 64, kernel_size=1, bias=False),
             nn.GroupNorm(8, 64),
-            nn.LeakyReLU(0.01, inplace=True)
+            nn.SiLU(inplace=True)
         )
         
         # 使用较大的池化目标尺寸 (4x7)，保留空间拓扑结构
@@ -66,7 +91,7 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
         self.linear = nn.Sequential(
             nn.Linear(n_flatten, 1024),
             nn.LayerNorm(1024),
-            nn.LeakyReLU(0.01, inplace=True),
+            nn.SiLU(inplace=True),
             nn.Linear(1024, features_dim),
             nn.LayerNorm(features_dim)
         )
@@ -76,17 +101,20 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
 
     def _initialize_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                # 卷积层：针对 LeakyReLU 优化初始化增益
-                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('leaky_relu', 0.01))
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
+                # 针对 SiLU 的初始化增益修复：SiLU 近似于 LeakyReLU
+                # PyTorch 不原生支持 calculate_gain('SiLU')
+                gain = nn.init.calculate_gain('leaky_relu', 0.01)
+                
+                # 兼容谱归一化：如果使用了 spectral_norm，权重存储在 weight_orig 中
+                target_weight = m.weight_orig if hasattr(m, 'weight_orig') else m.weight
+                nn.init.orthogonal_(target_weight, gain=gain)
+                
+                if hasattr(m, 'bias') and m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.LayerNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                # 线性层：正交初始化
-                nn.init.orthogonal_(m.weight, gain=1.0)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 

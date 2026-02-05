@@ -33,7 +33,9 @@ class AuxPPO(PPO):
         entropy_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
+        clip_fractions_vf = [] # 记录价值网络截断比例
         aux_losses = [] # 记录辅助损失
+        grad_norms = [] # 记录梯度范数
 
         continue_training = True
         # train for n_epochs epochs
@@ -45,6 +47,9 @@ class AuxPPO(PPO):
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
                     actions = rollout_data.actions.long().flatten()
+                elif isinstance(self.action_space, spaces.MultiDiscrete):
+                    # MultiDiscrete 动作通常已经是正确的 shape (batch_size, n_dims)
+                    actions = rollout_data.actions.long()
 
                 # 1. 拆解 evaluate_actions 以复用 features，避免重复运行重型 CNN (ResNet)
                 features = self.policy.extract_features(rollout_data.observations)
@@ -73,14 +78,22 @@ class AuxPPO(PPO):
                 clip_fractions.append(clip_fraction)
 
                 if self.clip_range_vf is None:
-                    values_pred = values
+                    value_loss = F.mse_loss(rollout_data.returns, values)
                 else:
-                    values_pred = rollout_data.old_values + th.clamp(
+                    # 裁剪后的预测值 (用于计算被截断后的损失)
+                    values_pred_clipped = rollout_data.old_values + th.clamp(
                         values - rollout_data.old_values, -clip_range_vf, clip_range_vf
                     )
-                
-                # Value loss
-                value_loss = F.mse_loss(rollout_data.returns, values_pred)
+                    # 未裁剪的损失 (保证在退步时有梯度)
+                    value_loss_unclipped = (rollout_data.returns - values) ** 2
+                    # 裁剪后的损失 (在进步过快时梯度为0)
+                    value_loss_clipped = (rollout_data.returns - values_pred_clipped) ** 2
+                    # 取二者最大值，是 PPO 保证价值网络在被扰动后仍能找回方向的关键
+                    value_loss = th.max(value_loss_unclipped, value_loss_clipped).mean()
+                    
+                    # 记录价值网络被截断的比例
+                    clip_fraction_vf = th.mean((th.abs(values - rollout_data.old_values) > clip_range_vf).float()).item()
+                    clip_fractions_vf.append(clip_fraction_vf)
                 value_losses.append(value_loss.item())
 
                 # Entropy loss
@@ -118,8 +131,9 @@ class AuxPPO(PPO):
                 # Optimization step
                 self.policy.optimizer.zero_grad()
                 loss.backward()
-                # Clip grad norm
-                th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                # Clip grad norm 并捕获裁剪前的范数
+                grad_norm = th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                grad_norms.append(grad_norm.item())
                 self.policy.optimizer.step()
 
             self._n_updates += 1
@@ -130,11 +144,14 @@ class AuxPPO(PPO):
 
         # Logs
         self.logger.record("train/entropy_loss", np.mean(entropy_losses))
-        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+        self.logger.record("train/policy_loss", np.mean(pg_losses))
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/aux_loss", np.mean(aux_losses)) # 记录辅助损失
+        self.logger.record("train/grad_norm", np.mean(grad_norms))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        if len(clip_fractions_vf) > 0:
+            self.logger.record("train/clip_fraction_vf", np.mean(clip_fractions_vf))
         self.logger.record("train/loss", loss.item())
         self.logger.record("train/explained_variance", explained_var)
         if hasattr(self.policy, "log_std"):

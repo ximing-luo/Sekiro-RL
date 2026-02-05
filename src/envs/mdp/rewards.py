@@ -5,6 +5,8 @@
 
 import os
 import re
+import torch as th
+import numpy as np
 
 def _log(message):
     """统一处理打印和文件记录"""
@@ -75,9 +77,6 @@ def player_stamina_reward(env, prev_metrics, next_metrics, action, events, **kwa
             val = -1 * diff * 0.01
             _log(f"\033[96m自身架势惩罚: reward: {val:.2f}, 伤害: {diff}\033[0m")
             return val
-        if -100 < diff < 0: # 躯干回跌
-            val = diff * 0.001
-            return val
     return 0.0
 
 def boss_stamina_reward(env, prev_metrics, next_metrics, action, events, **kwargs):
@@ -98,22 +97,41 @@ def boss_stamina_reward(env, prev_metrics, next_metrics, action, events, **kwarg
             # 纲量统一：100 伤害对应 1.0 原始分
             reward += stamina_diff * 0.01 
             _log(f"\033[93mBoss架势奖励: reward: {reward:.2f}, 伤害: {stamina_diff}, 引导分: {posture_build_up_bonus:.4f}\033[0m")
-        if -1000 < stamina_diff < 0: # 回躯干惩罚
+        if -1000 < stamina_diff < -10: # 回躯干惩罚
             reward += stamina_diff * 0.001
     return reward
 
 def survival_reward(env, action, **kwargs):
     """生存奖励/惩罚：通过动作成本引导精准战斗。"""
-    # 动作正则化：除观察(0)和防御(2)外，所有动作(攻击、闪避等)均有微小成本
-    # 目的：减少无意义动作导致的后摇受击，强迫模型“看准再动”
-    # 0.02 代表动作成本：若连续 50 帧乱按攻击，将亏损 1.0 原始分
-    reward = -0.02 if action not in [0, 2] else 0.0
-    reward += 0.01 if action in [6, 7, 8, 9] else 0.0
-    # 纸人消耗 (action=5)：在动作成本基础上额外扣除
-    reward -= 0.04 if action == 5 else 0.0
+    # 兼容性处理：适配 Multi-Discrete (array/list) 和 Discrete (int)
+    if isinstance(action, (list, th.Tensor, np.ndarray)):
+        # 现在只有两个头：[move_idx, skill_idx]
+        move_idx, skill_idx = action
+        num_heads = len(action)
+    else:
+        # 兼容旧逻辑
+        move_idx = skill_idx = action
+        num_heads = 1
     
-    # 耗时惩罚：促使对局进行的“底噪压力”
-    # 0.01 代表时间成本：每过 100 帧(约 1.6 秒)扣除 1.0 原始分
-    # 确保模型在安全观察的同时，仍有动力寻找进攻机会
-    reward -= 0.01 
-    return reward
+    reward = 0.0
+    
+    # 1. 移动头 (0:不动, 1-4:移动)
+    # 鼓励积极移动
+    if move_idx != 0:
+        reward -= 0.01
+        
+    # 2. 动作/技能头 (0:无, 1:攻击, 2:防御, 3:垫步, 4:跳跃)
+    if skill_idx == 1: # 攻击
+        reward -= 0.02
+    elif skill_idx == 2: # 防御 (保持 0 成本，鼓励防御)
+        reward -= 0.0
+    elif skill_idx == 3: # 垫步
+        reward -= 0.02
+    elif skill_idx == 4: # 跳跃
+        reward -= 0.03
+    
+    # 3. 基础耗时惩罚 (底噪)
+    reward -= 0.02
+    
+    # 4. 保持量纲：除以动作头的个数 (现在是 2)
+    return reward / num_heads

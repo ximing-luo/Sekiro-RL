@@ -33,11 +33,11 @@ class RewardManager:
         # 5: Boss掉血, 6: 自身架势恶化(数值减小), 7: Boss架势恶化(数值减小), 8: Boss架势过低(可忍杀)
         
         # 自身死亡：死亡计数增加
-        if npd > pd:
+        if npd - pd == 1:
             events.append(0)
             print(f"\033[91m自身死亡检测：死亡计数从 {pd} 增加到 {npd}\033[0m")
         # Boss死亡：死亡计数增加
-        if ned > ed:
+        if ned - ed == 1:
             events.append(1)
             print(f"\033[91mBoss死亡检测：死亡计数从 {ed} 增加到 {ned}\033[0m")
         

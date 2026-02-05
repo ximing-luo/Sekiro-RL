@@ -23,16 +23,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
     def __init__(self, cfg: ManagerBasedRLEnvCfg):
         super().__init__(cfg)
         
-        # 1. 初始化回放缓冲 (仅当 buffer_size > 0 时)
-        self.replay_buffer = None
-        if cfg.buffer_size > 0:
-            self.replay_buffer = ReplayBuffer(
-                size=cfg.buffer_size,
-                frame_history_len=cfg.frame_history_len,
-                obs_shape=(3, cfg.scene.observation_h, cfg.scene.observation_w)
-            )
-        
-        # 2. 实例化管理器 (传入配置中的 Terms)
+        # 1. 实例化管理器 (传入配置中的 Terms)
         self.action_manager = ActionManager(cfg.actions)
         self.observation_manager = ObservationManager(cfg.observations)
         self.reward_manager = RewardManager(cfg.rewards)
@@ -43,8 +34,13 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self._setup_managers()
 
         # 4. 定义 Gymnasium 空间
-        # 动作空间：离散
-        self.action_space = spaces.Discrete(self.action_manager.get_action_dim())
+        # 动作空间：支持离散或多维离散
+        dims = self.action_manager.get_action_dim()
+        if isinstance(dims, (list, tuple, np.ndarray)):
+            self.action_space = spaces.MultiDiscrete(dims)
+        else:
+            self.action_space = spaces.Discrete(dims)
+        
         # 观测空间：图像 (C, H, W)
         self.observation_space = spaces.Box(
             low=0, 
@@ -84,8 +80,11 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         # 2.5 更新可视化 (如果有开启)
         frame = next_metrics.get('policy')
         if frame is not None:
-            # 这里的 frame 已经是 transpose 之前的 HWC 格式，适合 CV2 显示
-            self.scene_manager.update_debug_visualization(frame)
+            # 如果 frame 是 CHW 格式，转换为 HWC 供 cv2 可视化
+            display_frame = frame
+            if frame.ndim == 3 and frame.shape[0] == 3:
+                display_frame = frame.transpose(1, 2, 0)
+            self.scene_manager.update_debug_visualization(display_frame)
 
         # 3. 检测事件并计算奖励
         events = self.reward_manager.detect_events(self.last_metrics, next_metrics)
@@ -99,17 +98,6 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         self.last_total_reward_raw = float(reward)
         self.last_events = list(events)
         self.last_events_feedback = [[name, float(val)] for name, val in components.items()]
-        
-        # 6. 写入回放缓冲 (如果开启且观测项中包含 'policy' 图像)
-        frame = next_metrics.get('policy')
-        if frame is not None:
-            # 统一转换为 CHW 格式 (SB3 和 PyTorch 常用)
-            if frame.ndim == 3 and frame.shape[-1] == 3:
-                frame = frame.transpose(2, 0, 1)
-            
-            if self.replay_buffer is not None:
-                self.replay_buffer.add(frame, action, float(reward), terminated)
-            
         self.last_metrics = next_metrics
 
         # 7. 构造 info 字典
@@ -120,7 +108,9 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         }
 
         # 8. 返回符合空间的观测值 (优先返回 policy 图像)
-        obs = frame if frame is not None else np.zeros(self.observation_space.shape, dtype=np.uint8)
+        obs = next_metrics.get('policy')
+        if obs is None:
+            obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
 
         return obs, float(reward), terminated, truncated, info
 
@@ -132,18 +122,13 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         super().reset(seed=seed) # 遵循 Gymnasium 标准处理 seed
         
         self.last_metrics = self.observation_manager.compute_observations(self)
-        frame = self.last_metrics.get('policy')
-        if frame is not None:
-            # 统一转换为 CHW 格式
-            if frame.ndim == 3 and frame.shape[-1] == 3:
-                frame = frame.transpose(2, 0, 1)
-            
-            if self.replay_buffer is not None:
-                self.replay_buffer.add(frame, 0, 0.0, False)
-            
         self.termination_manager.reset()
         self.over = False
         
-        obs = frame if frame is not None else np.zeros(self.observation_space.shape, dtype=np.uint8)
+        # 直接从 metrics 中获取图像 (源头已处理为 CHW)
+        obs = self.last_metrics.get('policy')
+        if obs is None:
+            obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
+            
         info = {"metrics": self.last_metrics}
         return obs, info
