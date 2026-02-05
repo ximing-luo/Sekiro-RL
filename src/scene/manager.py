@@ -80,11 +80,11 @@ class SceneManager:
                     paused = False
                     print('start game')
                     time.sleep(1)
-                if 'P' in keys:
-                    paused = False
-                    # 这里可能需要通知 Env 结束
-                    time.sleep(1)
-                    return True, paused # (should_over, paused)
+                # if 'P' in keys:
+                #     paused = False
+                #     # 这里可能需要通知 Env 结束
+                #     time.sleep(1)
+                #     return True, paused # (should_over, paused)
         return False, paused
 
     def stop(self):

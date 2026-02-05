@@ -20,5 +20,7 @@ class ActionManager:
             threading.Thread(target=fn, daemon=True).start()
 
     def get_action_dim(self):
-        # 假设 action_term 的 params 中包含 dim 信息
+        # 优先检查 dims (MultiDiscrete)，其次检查 dim (Discrete)
+        if 'dims' in self.action_term.params:
+            return self.action_term.params['dims']
         return self.action_term.params.get('dim', 0) if self.action_term else 0

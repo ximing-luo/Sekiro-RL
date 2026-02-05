@@ -36,7 +36,7 @@ class BasicBlock(nn.Module):
         # - 第1层：3x3 深度卷积（groups=in_channels），按通道独立提取局部特征；stride 控制是否下采样
         # - 第2层：1x1 点卷积，将通道从 in_channels 映射到 out_channels，实现通道混合
         # - 第3层：GroupNorm，做归一化与可学习的缩放/平移（替代 BatchNorm 以增强 RL 稳定性）
-        # - 第4层：ReLU 激活
+        # - 第4层：SiLU 激活
         # - 第5层：3x3 深度卷积（groups=out_channels），再次提取局部特征
         # - 第6层：1x1 点卷积，将通道映射到 out_channels * expansion（BasicBlock.expansion=1）
         # - 第7层：GroupNorm
@@ -44,7 +44,7 @@ class BasicBlock(nn.Module):
             nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=stride, groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, bias=False),
             nn.GroupNorm(min(8, out_channels), out_channels),
-            nn.ReLU(inplace=True),
+            nn.SiLU(inplace=True),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, groups=out_channels, padding=1, bias=False),
             nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=1, padding=0, bias=False),
             nn.GroupNorm(min(8, out_channels * BasicBlock.expansion), out_channels * BasicBlock.expansion)
@@ -64,8 +64,8 @@ class BasicBlock(nn.Module):
             )
 
     def forward(self, x):
-        # 前向：主分支与捷径分支输出相加后再 ReLU，形成残差学习
-        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+        # 前向：主分支与捷径分支输出相加后再 SiLU，形成残差学习
+        return nn.SiLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
 
 class BottleNeck(nn.Module):
 
@@ -80,14 +80,14 @@ class BottleNeck(nn.Module):
             # 第1层：1x1 卷积 - 把高通道压缩到低通道 (out_channels)，就像把宽路缩成窄瓶颈
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             nn.GroupNorm(min(8, out_channels), out_channels),
-            nn.ReLU(inplace=True),
+            nn.SiLU(inplace=True),
 
             # -- 第二步：卷积 (Convolution) --
             # 第2层：3x3 深度卷积 + 1x1 点卷积 - 在低维空间做核心特征提取，非常省显存
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, groups=out_channels, padding=1, bias=False),
             nn.Conv2d(out_channels, out_channels, kernel_size=1, padding=0, bias=False),
             nn.GroupNorm(min(8, out_channels), out_channels),
-            nn.ReLU(inplace=True),
+            nn.SiLU(inplace=True),
 
             # -- 第三步：扩张 (Expand) --
             # 第3层：1x1 卷积 - 把通道数暴力弹射起步，变成原来的 4 倍 (BottleNeck.expansion=4)
@@ -108,8 +108,8 @@ class BottleNeck(nn.Module):
             )
 
     def forward(self, x):
-        # 前向：主分支 + 捷径分支，再 ReLU
-        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+        # 前向：主分支 + 捷径分支，再 SiLU
+        return nn.SiLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
 
 
 class DQN(nn.Module):
@@ -121,12 +121,12 @@ class DQN(nn.Module):
         # 输入对齐模块：
         # - 3x3 深度卷积（groups=in_channels）按通道独立提取局部特征（可视为每帧/每色通道的空间处理）
         # - 1x1 点卷积将通道映射到 64，统一后续残差层的输入通道数
-        # - GroupNorm + ReLU 稳定训练
+        # - GroupNorm + SiLU 稳定训练
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3,groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=1, padding=1, bias=False),
             nn.GroupNorm(8, 64),
-            nn.ReLU(inplace=True)
+            nn.SiLU(inplace=True)
         )
 
         self.conv2_x = self._make_layer(block, 64, num_blocks[0], 1)
@@ -178,7 +178,7 @@ class Dueling_DQN(nn.Module):
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=3,groups=in_channels, padding=1, bias=False),
             nn.Conv2d(in_channels=in_channels, out_channels=64, kernel_size=1, padding=1, bias=False),
             nn.GroupNorm(8, 64),
-            nn.ReLU(inplace=True)
+            nn.SiLU(inplace=True)
         )
 
         self.conv2_x = self._make_layer(block, 64, num_blocks[0], 1)

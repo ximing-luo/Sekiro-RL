@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import os
 from stable_baselines3.common.callbacks import BaseCallback
-from src.envs.mdp.actions import ACTION_LABELS
 from src.visualization.tensorboard_utils import TensorboardHookManager
 
 class SekiroCombinedCallback(BaseCallback):
@@ -39,9 +38,9 @@ class SekiroCombinedCallback(BaseCallback):
                 writer = output_format.writer
                 break
         
-        # if writer is not None:
-        #     self.hook_manager = TensorboardHookManager(self.model, writer, log_interval=self.log_interval)
-        #     self.hook_manager.register_hooks()
+        if writer is not None:
+            self.hook_manager = TensorboardHookManager(self.model, writer, log_interval=self.log_interval)
+            self.hook_manager.register_hooks()
 
     def _on_step(self) -> bool:
         # 1. 从 infos 提取奖励分量
@@ -126,7 +125,7 @@ class SekiroCombinedCallback(BaseCallback):
     def _save_debug_images(self, samples):
         """将采样张量保存为本地图片。"""
         # 确保目录存在
-        debug_dir = "debug_samples"
+        debug_dir = "logs\data\debug_samples"
         if not os.path.exists(debug_dir):
             os.makedirs(debug_dir)
             
@@ -144,13 +143,14 @@ class SekiroCombinedCallback(BaseCallback):
         self.iteration += 1
         print(f"\n[Step {self.num_timesteps}] 采集完成，正在运行诊断并开始训练...")
         
-        # 0. 运行特征相似度诊断 (此时 rollout_buffer 已满，数据最全)
+        # 1. 运行特征相似度诊断 (此时 rollout_buffer 已满，数据最全)
         self._analyze_feature_similarity()
         
-        # 1. 记录动作分布直方图到 TensorBoard
-        self._log_action_distribution()
+        # 2. 记录动作分布直方图与特征图
+        if self.hook_manager:
+            self.hook_manager.log_action_distribution()
 
-        # 2. 记录特征相似度到 TensorBoard
+        # 3. 记录特征相似度到 TensorBoard
         self.logger.record("Diagnostic/Avg_Synthetic_Similarity", self.last_sim_metrics["synthetic_avg"])
         self.logger.record("Diagnostic/Avg_Experience_Similarity", self.last_sim_metrics["experience_avg"])
 
@@ -197,36 +197,6 @@ class SekiroCombinedCallback(BaseCallback):
         if "train/loss" in metrics:
             print(f"训练损失:       {metrics['train/loss']:.4f}")
         print("="*50 + "\n")
-
-    def _log_action_distribution(self):
-        """从 rollout_buffer 采样并记录动作 Logits 与 Probabilities 直方图。"""
-        if self.hook_manager is None or self.hook_manager.writer is None:
-            return
-        
-        writer = self.hook_manager.writer
-        # 获取本轮采集的观测值 (n_steps, n_envs, C, H, W)
-        obs = self.model.rollout_buffer.observations
-        
-        with torch.no_grad():
-            # 展平并采样数据
-            flat_obs = torch.as_tensor(obs).view(-1, *obs.shape[2:]).to(self.model.device)
-            # 限制采样数量以防计算过慢
-            num_samples = min(256, flat_obs.size(0))
-            idx = torch.randperm(flat_obs.size(0))[:num_samples]
-            obs_sample = flat_obs[idx]
-            
-            # 获取分布
-            distribution = self.model.policy.get_distribution(obs_sample)
-            logits = distribution.distribution.logits  # (batch, action_dim)
-            probs = torch.softmax(logits, dim=-1)     # (batch, action_dim)
-            
-            # 记录到 TensorBoard
-            for i in range(logits.shape[1]):
-                label = ACTION_LABELS[i] if i < len(ACTION_LABELS) else f"Action_{i}"
-                # 记录 Logits (观察网络输出强度)
-                writer.add_histogram(f"Action_Dist/Logits_{label}", logits[:, i], self.num_timesteps)
-                # 记录 Probabilities (观察最终概率分布)
-                writer.add_histogram(f"Action_Dist/Probs_{label}", probs[:, i], self.num_timesteps)
 
     def _on_training_end(self):
         if self.hook_manager:

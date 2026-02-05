@@ -25,9 +25,14 @@ def memory_metrics(env, **kwargs):
     }
 
 def image_frame(env, **kwargs):
-    """获取最新图像帧。"""
+    """获取最新图像帧并转换为 CHW 格式。"""
     if env.scene_manager:
-        return env.scene_manager.get_latest_frame()
+        frame = env.scene_manager.get_latest_frame()
+        if frame is not None:
+            # OpenCV 默认是 HWC (H, W, 3)，转换为 PyTorch 要求的 CHW (3, H, W)
+            if frame.ndim == 3 and frame.shape[-1] == 3:
+                return frame.transpose(2, 0, 1)
+        return frame
     return None
 
 def last_action(env, action, **kwargs):
