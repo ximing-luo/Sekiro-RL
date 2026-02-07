@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
-from src.envs.manager_based_env_cfg import SceneCfg, RewardTermCfg, ObservationTermCfg, TerminationTermCfg, ActionTermCfg
-from src.envs.manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
-import src.envs.mdp as mdp
+from src.gamelab.envs.manager_based_env_cfg import SceneCfg, RewardTermCfg, ObservationTermCfg, TerminationTermCfg, ActionTermCfg
+from src.gamelab.envs.manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
+import src.gamelab.envs.mdp as mdp
 import configs.config as config
 
 @dataclass
@@ -58,3 +58,12 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     buffer_size: int = config.cfg.rl.buffer_size
     frame_history_len: int = config.cfg.rl.frame_history_len
     n_step_rewards: int = config.cfg.rl.n_step_rewards
+
+    # 7. 训练回调配置 (SB3 风格)
+    # 允许在不修改 train.py 的情况下，通过配置挂载不同的观察/诊断工具
+    callbacks: list = field(default_factory=lambda: [
+        {
+            "class": "src.framework.sb3.callbacks.SekiroCombinedCallback",
+            "params": {"log_interval": 1000}
+        }
+    ])

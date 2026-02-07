@@ -10,7 +10,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.envs.manager_based_rl_env import ManagerBasedRLEnv
+from src.gamelab.envs.manager_based_rl_env import ManagerBasedRLEnv
 from src.tasks.sekiro.sekiro_env_cfg import SekiroEnvCfg
 
 class Sekiro(ManagerBasedRLEnv):
