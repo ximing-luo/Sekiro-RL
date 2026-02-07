@@ -35,12 +35,25 @@ class ActionManager(ManagerBase):
             term_name = self._term_names[0]
             term_cfg = self.cfg[term_name]
             
-            # 获取动作函数。注意：action[0] 取第一个环境的动作，因为目前只支持单环境执行
-            # 未来需要处理并行环境下的物理输入模拟
-            fn = term_cfg.func(action[0], **term_cfg.params)
+            # 获取动作内容
+            # 如果是 batched action [num_envs, action_dim]，取第一个环境
+            # 如果是单环境 action [action_dim]，直接使用
+            if action.ndim == 2:
+                action_to_apply = action[0]
+            else:
+                action_to_apply = action
+            
+            # 确保 action_to_apply 是可迭代的（对于 MultiDiscrete）
+            # 如果是 0-d tensor，转换为 1-d
+            if action_to_apply.ndim == 0:
+                action_to_apply = action_to_apply.unsqueeze(0)
+            
+            # 获取动作函数
+            fn = term_cfg.func(action_to_apply, **term_cfg.params)
             
             # 异步执行按键模拟
-            threading.Thread(target=fn, daemon=True).start()
+            if callable(fn):
+                threading.Thread(target=fn, daemon=True).start()
 
     def reset(self, env_ids: Sequence[int] | None = None):
         return {}

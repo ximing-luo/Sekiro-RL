@@ -1,5 +1,3 @@
-
-
 from src.gamelab.utils.configclass import configclass
 
 @configclass

@@ -13,9 +13,9 @@ class ObservationManager(ManagerBase):
     支持观测组、自动拼接和 Tensor 缓存。
     """
     def __init__(self, cfg: Dict[str, ObservationGroupCfg], env: ManagerBasedEnv):
-        super().__init__(cfg, env)
         self._group_obs: Dict[str, torch.Tensor] = {}
         self._term_values: Dict[str, Dict[str, torch.Tensor]] = {}
+        super().__init__(cfg, env)
 
     @property
     def active_terms(self) -> Dict[str, List[str]]:

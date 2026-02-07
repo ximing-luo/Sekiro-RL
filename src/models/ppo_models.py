@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
+from typing import Dict
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from src.models.resnet import BasicBlock, BottleNeck
+from gymnasium import spaces
 
 class SEBlock(nn.Module):
     """
@@ -131,4 +133,39 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
             layers.append(block(self.in_channels, out_channels, stride))
             self.in_channels = out_channels * block.expansion
         return nn.Sequential(*layers)
+
+class SekiroMultiInputExtractor(BaseFeaturesExtractor):
+    """
+    多输入特征提取器 (Isaac Lab 风格)：
+    1. 视觉分支：使用 SekiroStableExtractor 处理图像。
+    2. 遥测分支：直接处理数值特征。
+    3. 特征融合：拼接视觉与遥测特征并映射到统一维度。
+    """
+    def __init__(self, observation_space: spaces.Dict, features_dim: int = 512):
+        super().__init__(observation_space, features_dim)
+        
+        # A. 视觉分支 (使用原有的稳定提取器)
+        self.image_extractor = SekiroStableExtractor(observation_space["image"], features_dim=features_dim)
+        
+        # B. 遥测分支
+        telemetry_dim = observation_space["telemetry"].shape[0]
+        
+        # C. 特征融合层
+        # 融合视觉 (features_dim) 和 遥测 (telemetry_dim)
+        self.fusion = nn.Sequential(
+            nn.Linear(features_dim + telemetry_dim, features_dim),
+            nn.LayerNorm(features_dim),
+            nn.SiLU(inplace=True)
+        )
+
+    def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
+        # 1. 提取视觉特征
+        img_feats = self.image_extractor(observations["image"])
+        
+        # 2. 获取遥测特征
+        tele_feats = observations["telemetry"]
+        
+        # 3. 拼接并融合
+        combined = torch.cat([img_feats, tele_feats], dim=1)
+        return self.fusion(combined)
 

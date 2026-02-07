@@ -57,9 +57,9 @@ class PERConfig:
 @dataclass(frozen=True)
 class PathConfig:
     """路径与日志配置。"""
-    model_path: str = "models/dqn_model.pth"
+    model_path: str = "outputs/models/dqn_model.pth"
     log_dir: str = "logs"
-    tb_log_interval: int = 1000
+    tb_log_interval: int = 2000
 
 @dataclass(frozen=True)
 class GlobalConfig:

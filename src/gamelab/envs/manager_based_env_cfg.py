@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable
 from src.gamelab.managers.manager_term_cfg import (
     ObservationGroupCfg,
+    ObservationTermCfg,
     ActionTermCfg,
     EventTermCfg,
     RewardTermCfg,

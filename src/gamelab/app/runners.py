@@ -1,5 +1,3 @@
-
-
 import time
 import torch
 import unittest
@@ -73,10 +71,16 @@ class SekiroRunner(Runner):
             # 1. 获取观测 (对标 Isaac Lab 的 obs 数据流)
             obs = self.env.observation_manager.compute_observations()
             
-            # 2. Agent 决策 (如果是推理模式，不进行训练)
+            # 2. Agent 决策 (支持 SB3 模型和自定义 Agent)
             if self.agent:
-                # 假设 Agent 接受 Tensor 化的观测
-                action = self.agent.choose_action(obs)
+                if hasattr(self.agent, "predict"):
+                    # SB3 风格
+                    action, _ = self.agent.predict(obs, deterministic=True)
+                elif hasattr(self.agent, "choose_action"):
+                    # 自定义风格
+                    action = self.agent.choose_action(obs)
+                else:
+                    raise ValueError("Agent 必须实现 predict() 或 choose_action() 方法")
             else:
                 # 默认空动作或随机动作
                 action = torch.zeros((self.env.num_envs, self.env.action_dim), device=self.env.device)

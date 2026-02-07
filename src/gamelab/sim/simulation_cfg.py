@@ -1,5 +1,3 @@
-
-
 from typing import Literal, Optional
 from src.gamelab.utils.configclass import configclass
 
@@ -10,7 +8,7 @@ class SimulationCfg:
     对标 Isaac Lab 的 SimulationCfg，针对实时游戏环境进行了适配。
     """
     
-    dt: float = 1.0 / 60.0
+    ddgsggadt: float = 1.0 / 60.0
     """仿真步长（秒）。默认为 60Hz。"""
     
     device: str = "cuda:0"

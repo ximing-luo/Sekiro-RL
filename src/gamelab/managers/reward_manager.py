@@ -1,6 +1,6 @@
 from __future__ import annotations
 import torch
-from typing import TYPE_CHECKING, Dict, List, Any, Sequence
+from typing import TYPE_CHECKING, Dict, List, Any, Sequence, Tuple
 from .manager_base import ManagerBase
 from .manager_term_cfg import RewardTermCfg
 
@@ -33,9 +33,10 @@ class RewardManager(ManagerBase):
         # 可以在这里预处理 term 函数，检查合法性等
         pass
 
-    def compute_reward(self, prev_metrics: Any, next_metrics: Any, action: Any, events: List[int]) -> torch.Tensor:
-        """计算并返回总奖励。"""
+    def compute_reward(self, prev_metrics: Any, next_metrics: Any, action: Any, events: List[int]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """计算并返回总奖励及分量。"""
         self._reward_buf.zero_()
+        components = {}
         
         for name, term_cfg in self.cfg.items():
             # 计算奖励项原始值
@@ -56,10 +57,13 @@ class RewardManager(ManagerBase):
             weighted_val = val * term_cfg.weight
             self._reward_buf += weighted_val
             
+            # 记录分量
+            components[name] = weighted_val
+            
             # 更新累积值
             self._episode_sums[name] += weighted_val
             
-        return self._reward_buf.clone()
+        return self._reward_buf.clone(), components
 
     def reset(self, env_ids: Sequence[int] | None = None):
         """重置指定环境的累积奖励。"""

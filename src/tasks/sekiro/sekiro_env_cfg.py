@@ -38,7 +38,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     # 2. 观测项配置 (Observation Groups)
     observations: dict = field(default_factory=lambda: {
         "policy": ObservationGroupCfg(
-            concatenate_terms=True,
+            concatenate_terms=False,
             terms={
                 "image": ObservationTermCfg(func=sekiro_mdp.observations.image_frame),
                 "telemetry": ObservationTermCfg(func=sekiro_mdp.observations.memory_metrics),
@@ -99,6 +99,6 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     callbacks: list = field(default_factory=lambda: [
         {
             "class": "src.gamelab.utils.rl.sb3.SekiroCombinedCallback",
-            "params": {"log_interval": 1000}
+            "params": {"log_interval": config.cfg.path.tb_log_interval}
         }
     ])

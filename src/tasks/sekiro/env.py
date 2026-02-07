@@ -13,7 +13,6 @@ if project_root not in sys.path:
 from src.gamelab.envs.manager_based_rl_env import ManagerBasedRLEnv
 from src.tasks.sekiro.sekiro_env_cfg import SekiroEnvCfg
 from src.gamelab.sim.sensors.memory_sensor import MemorySensor
-from src.gamelab.assets.sekiro.telemetry import SekiroTelemetry
 
 class Sekiro(ManagerBasedRLEnv):
     """

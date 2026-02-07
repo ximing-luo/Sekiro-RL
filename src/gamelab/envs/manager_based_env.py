@@ -119,6 +119,9 @@ class ManagerBasedEnv:
 
     def step(self, action: torch.Tensor) -> tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, Dict]:
         """执行一个环境步。"""
+        # 0. 获取当前指标作为 prev_metrics
+        prev_metrics = self.get_metrics()
+
         # 1. 执行动作
         self.action_manager.apply_action(action)
         
@@ -128,23 +131,64 @@ class ManagerBasedEnv:
         # 3. 同步游戏状态 (从内存读取资产数据)
         self.scene.update(self.sim.cfg.dt)
         
-        # 3. 计算奖励、终止和事件
-        reward = self.reward_manager.compute_reward()
-        done, time_out = self.termination_manager.compute_terminations()
+        # 3.5 获取最新指标作为 next_metrics 并计算事件
+        next_metrics = self.get_metrics()
+        events = self.event_manager.compute_events(prev_metrics, next_metrics)
+
+        # 4. 计算奖励、终止
+        reward, reward_components = self.reward_manager.compute_reward(
+            prev_metrics=prev_metrics,
+            next_metrics=next_metrics,
+            action=action,
+            events=events
+        )
+        done, time_out = self.termination_manager.compute_terminations(
+            prev_metrics=prev_metrics,
+            next_metrics=next_metrics,
+            events=events
+        )
         
-        # 4. 获取最新观测
+        # 5. 获取最新观测
         obs = self.observation_manager.compute_observations()
         
-        # 5. 更新步数计数器
+        # 6. 更新步数计数器
         self.common_step_counter += 1
         
         # 封装 info
         info = {
             "time_out": time_out,
-            "step": self.common_step_counter
+            "step": self.common_step_counter,
+            "events": events,
+            "reward_components": reward_components
         }
         
         return obs, reward, done, time_out, info
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """获取当前环境的指标字典，供 Reward/Event 管理器使用。"""
+        # 目前只支持 telemetry 传感器提供的指标
+        # 也可以从 scene.assets 中提取
+        metrics = {"telemetry": {}}
+        
+        # 从 SekiroAsset 中提取数据 (如果存在)
+        if "player" in self.scene.assets:
+            player = self.scene.assets["player"]
+            if hasattr(player, "data"):
+                data = player.data
+                metrics["telemetry"].update({
+                    "self_blood": data.player_hp,
+                    "self_blood_max": data.player_hp_max,
+                    "self_stamina": data.player_posture,
+                    "self_stamina_max": data.player_posture_max,
+                    "boss_blood": data.enemy_hp,
+                    "boss_blood_max": data.enemy_hp_max,
+                    "boss_stamina": data.enemy_posture,
+                    "boss_stamina_max": data.enemy_posture_max,
+                    "player_deaths": data.player_deaths,
+                    "enemy_deaths": data.enemy_deaths
+                })
+        
+        return metrics
 
     def activate_window(self):
         if self.sim:

@@ -2,54 +2,61 @@ import os
 import sys
 import time
 import argparse
+import torch
 
-# 将项目根目录添加到 sys.path
+# 1. 确保项目根目录在路径中
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from src.gamelab.app.app_launcher import AppLauncher
+from src.gamelab.app.runners import SekiroRunner
+from src.framework.sb3.ppo_aux import AuxPPO
 import src.gamelab.interfaces.window_utils as window_utils
-from src.gamelab.app.runners import init_env_agent, wait_buffer, SekiroRunner
 import configs.config as config
 
 def main():
-    parser = argparse.ArgumentParser(description="Sekiro-RL 推理入口 (Isaac Lab 风格)")
-    parser.add_argument("--task", type=str, default="Sekiro-v0", help="要运行的任务 ID")
-    parser.add_argument("--pos", type=str, default=config.cfg.scene.pos, help="窗口位置 (center/offscreen)")
-    parser.add_argument("--steps", type=int, default=100000, help="总交互步数")
-    parser.add_argument("--model_path", type=str, default=config.cfg.path.model_path, help="模型加载路径")
+    # 1. 初始化启动器
+    launcher = AppLauncher()
     
-    args = parser.parse_args()
+    # 2. 添加推理特定参数
+    parser = argparse.ArgumentParser(description="Sekiro-RL 推理入口 (Isaac Lab 风格)", add_help=False)
+    play_group = parser.add_argument_group("推理特定参数")
+    play_group.add_argument("--model_path", type=str, default=config.cfg.path.model_path, help="模型加载路径")
+    play_group.add_argument("--steps", type=int, default=10000, help="运行总步数")
+    
+    # 合并参数
+    args, _ = parser.parse_known_args(namespace=launcher.args)
 
-    # 1. 初始化环境、代理与执行器
-    env, agent, env_cfg = init_env_agent(
-        task_name=args.task,
-        pos=args.pos,
-        img_width=config.cfg.scene.img_width,
-        img_height=config.cfg.scene.img_height,
-        action_dim=None,
-        model_path=args.model_path,
-        n_step_rewards=config.cfg.rl.n_step_rewards
-    )
+    # 3. 创建环境
+    env, env_cfg = launcher.create_env()
     
+    # 4. 加载 Agent (SB3 模型)
+    print(f"[INFO] 正在加载模型: {args.model_path}")
+    if not os.path.exists(args.model_path):
+        print(f"[ERROR] 模型文件不存在: {args.model_path}")
+        return
+
+    # 加载模型
+    agent = AuxPPO.load(args.model_path, device=launcher.device)
+    
+    # 5. 初始化执行器
     runner = SekiroRunner(env, agent, env_cfg)
     
-    print(f"正在以推理模式运行任务: {args.task}, 模型: {args.model_path}")
+    print(f"[INFO] 正在以推理模式运行任务: {launcher.task_name}")
     
-    # 2. 配置推理模式
-    agent.eval()
-    
-    # 3. 准备运行环境
-    env.pause_game(True)
-    wait_buffer(env)
-    
-    # 4. 执行推理循环
-    env.reset()
-    runner.run_episode(0, 0, args.steps, is_train=False)
-            
-    print("运行结束。")
-    time.sleep(1.0)
-    window_utils.move_window("Sekiro", "center")
+    # 6. 执行推理循环
+    try:
+        # 重置环境
+        env.reset()
+        # 运行 runner
+        runner.run(total_steps=args.steps)
+    except KeyboardInterrupt:
+        print("[WARN] 推理被手动中断。")
+    finally:
+        env.close()
+        print("[INFO] 环境已关闭。")
+        window_utils.move_window("Sekiro", "center")
 
 if __name__ == "__main__":
     main()

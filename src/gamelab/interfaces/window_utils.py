@@ -10,6 +10,7 @@
 """
 import win32gui
 import win32con
+import win32api
 
 def find_window_by_title_contains(title_part, strict=False):
     title_q = (str(title_part) if title_part is not None else "").strip()
@@ -104,16 +105,63 @@ def remove_window_topmost(window_title_part):
         print(f"An error occurred: {e}")
         return False
 
-def move_window(window_title_part, x, y, width, height):
+def move_window(window_title_part, x, y=None, width=None, height=None):
+    """移动并调整窗口大小。
+    
+    支持两种调用方式：
+    1. move_window(title, x, y, width, height) - 经典 win32 风格
+    2. move_window(title, pos_str, repaint=True) - 预设位置风格 (top_left, center 等)
+    """
     try:
         hwnd = find_window_by_title_contains(window_title_part)
-        if hwnd:
-            win32gui.MoveWindow(hwnd, x, y, width, height, True)
-            print(f"Window with title containing '{window_title_part}' moved to ({x}, {y}) with size {width}x{height}.")
-            return True
-        else:
+        if not hwnd:
             print(f"Window with title containing '{window_title_part}' not found.")
             return False
+
+        # 处理预设位置字符串 (如 "top_left")
+        if isinstance(x, str):
+            pos_str = x
+            repaint = y if y is not None else True
+            
+            # 获取窗口当前大小
+            rect = win32gui.GetWindowRect(hwnd)
+            w = width if width is not None else (rect[2] - rect[0])
+            h = height if height is not None else (rect[3] - rect[1])
+            
+            # 获取屏幕大小
+            sw = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
+            sh = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+            
+            # 计算坐标
+            nx, ny = 0, 0
+            if pos_str == "top_left":
+                nx, ny = 0, 0
+            elif pos_str == "top_right":
+                nx, ny = sw - w, 0
+            elif pos_str == "bottom_left":
+                nx, ny = 0, sh - h
+            elif pos_str == "bottom_right":
+                nx, ny = sw - w, sh - h
+            elif pos_str == "center":
+                nx, ny = (sw - w) // 2, (sh - h) // 2
+            elif pos_str == "offscreen":
+                nx, ny = -w - 100, -h - 100
+            else:
+                print(f"Unknown position string: {pos_str}")
+                return False
+                
+            win32gui.MoveWindow(hwnd, nx, ny, w, h, repaint)
+            print(f"Window '{window_title_part}' moved to {pos_str} ({nx}, {ny}) with size {w}x{h}.")
+            return True
+        else:
+            # 经典 5 参数调用
+            if y is None or width is None or height is None:
+                print("Error: move_window requires (x, y, width, height) when x is not a string.")
+                return False
+            win32gui.MoveWindow(hwnd, x, y, width, height, True)
+            print(f"Window '{window_title_part}' moved to ({x}, {y}) with size {width}x{height}.")
+            return True
+            
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred in move_window: {e}")
         return False

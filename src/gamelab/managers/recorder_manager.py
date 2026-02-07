@@ -1,26 +1,38 @@
+from __future__ import annotations
 import json
 import os
 import time
-from typing import Dict, Any
+from typing import TYPE_CHECKING, Dict, Any, List
+from .manager_base import ManagerBase
 
-class RecorderManager:
+if TYPE_CHECKING:
+    from src.gamelab.envs.manager_based_env import ManagerBasedEnv
+
+class RecorderManager(ManagerBase):
     """
     记录管理器：实现基于术语（Term-based）的数据记录。
     对标 Isaac Lab 的 RecorderManager。
     """
-    def __init__(self, cfg: Dict[str, Any], save_dir="data/demos"):
-        self.cfg = cfg
-        self.save_dir = save_dir
+    def __init__(self, cfg: Dict[str, Any], env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+        self.save_dir = "data/demos"
         os.makedirs(self.save_dir, exist_ok=True)
         self.current_trajectory = []
 
-    def record_step(self, env, obs, action, reward, next_obs, info):
+    @property
+    def active_terms(self) -> List[str]:
+        return list(self.cfg.keys())
+
+    def _prepare_terms(self):
+        pass
+
+    def record_step(self, obs, action, reward, next_obs, info):
         """遍历配置中的所有记录项。"""
         step_data = {"timestamp": time.time()}
         
         for name, term_cfg in self.cfg.items():
             val = term_cfg.func(
-                env=env,
+                env=self._env,
                 obs=obs,
                 action=action,
                 reward=reward,

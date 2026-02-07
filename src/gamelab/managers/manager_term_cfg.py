@@ -43,6 +43,16 @@ class CurriculumTermCfg(ManagerTermBaseCfg):
     pass
 
 @dataclass
+class ActionTermCfg(ManagerTermBaseCfg):
+    """动作项配置。"""
+    pass
+
+@dataclass
+class RecorderTermCfg(ManagerTermBaseCfg):
+    """记录项配置。"""
+    pass
+
+@dataclass
 class CommandTermCfg:
     """指令项配置。"""
     func: Callable[..., Any] = None

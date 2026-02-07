@@ -29,6 +29,8 @@ def memory_metrics(env, **kwargs):
 def image_frame(env, **kwargs):
     """获取最新图像帧并转换为 CHW 格式的 Tensor。"""
     sensor = env.sim.get_sensor("vision")
+    num_envs = env.num_envs
+    
     if sensor:
         frame = sensor.get_data()
         if frame is not None:
@@ -36,9 +38,13 @@ def image_frame(env, **kwargs):
             if frame.ndim == 3 and frame.shape[-1] == 3:
                 frame = frame.transpose(2, 0, 1)
             
-            # 转换为 Tensor 并归一化
-            return torch.from_numpy(frame).to(env.device).float() / 255.0
-    return torch.zeros((3, env.cfg.scene.observation_h, env.cfg.scene.observation_w), device=env.device)
+            # 转换为 Tensor 并归一化 [3, H, W]
+            frame_tensor = torch.from_numpy(frame).to(env.device).float() / 255.0
+            
+            # 扩展为 [num_envs, 3, H, W]
+            return frame_tensor.unsqueeze(0).repeat(num_envs, 1, 1, 1)
+            
+    return torch.zeros((num_envs, 3, env.cfg.scene.observation_h, env.cfg.scene.observation_w), device=env.device)
 
 def last_action(env, action, **kwargs):
     """将上一步动作作为观测的一部分。"""

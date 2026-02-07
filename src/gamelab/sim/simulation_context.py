@@ -1,5 +1,3 @@
-
-
 import time
 import torch
 import weakref
@@ -58,6 +56,12 @@ class SimulationContext:
     def add_sensor(self, name: str, sensor: BaseSensor):
         """注册传感器。"""
         self.sensors[name] = sensor
+
+    def get_sensor(self, name: str) -> BaseSensor:
+        """获取已注册的传感器实例。"""
+        if name not in self.sensors:
+            raise KeyError(f"传感器 '{name}' 尚未注册。已注册: {list(self.sensors.keys())}")
+        return self.sensors[name]
 
     def setup(self):
         """启动仿真环境。"""

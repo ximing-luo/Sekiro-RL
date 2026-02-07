@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
-from src.tasks.sekiro.mdp.actions import ACTION_LABELS, MULTI_DISCRETE_LABELS, MULTI_DISCRETE_HEAD_NAMES
+from src.tasks.sekiro.mdp.actions import MULTI_DISCRETE_LABELS, MULTI_DISCRETE_HEAD_NAMES
 
 class TensorboardHookManager:
     """
@@ -104,7 +104,7 @@ class TensorboardHookManager:
                 logits = distribution.distribution.logits.detach().cpu()
                 probs = torch.softmax(logits, dim=-1)
                 for i in range(logits.shape[1]):
-                    action_label = ACTION_LABELS[i] if i < len(ACTION_LABELS) else f"Action_{i}"
+                    action_label = f"Action_{i}"
                     tag_prefix = "Action_Dist"
                     self.writer.add_histogram(f"{tag_prefix}/Logits_{action_label}", logits[:, i], step)
                     self.writer.add_histogram(f"{tag_prefix}/Probs_{action_label}", probs[:, i], step)
