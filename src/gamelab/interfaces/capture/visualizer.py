@@ -1,5 +1,3 @@
-
-
 import time
 import threading
 import numpy as np

@@ -1,13 +1,3 @@
-"""
-模块用途：封装与《只狼》窗口交互的具体按键/动作执行原语。
-
-包含：
-- 函数：no_op, attack, defense, jump, dodge_forward, skill_attack, use_items
-
-边界：
-- 负责：触发具体输入事件与按键序列
-- 不负责：动作索引映射、奖励计算、训练逻辑
-"""
 import time
 import sys
 import os

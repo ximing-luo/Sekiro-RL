@@ -1,13 +1,3 @@
-"""
-模块用途：窗口管理与前台激活、移动、置顶等操作封装。
-
-包含：
-- 函数：move_window, activate_window_by_title_contains, set_window_topmost 等
-
-边界：
-- 负责：窗口层面的控制与摆放
-- 不负责：图像采集与训练逻辑
-"""
 import win32gui
 import win32con
 import win32api

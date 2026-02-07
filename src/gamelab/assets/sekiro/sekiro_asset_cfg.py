@@ -1,7 +1,3 @@
-
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 from dataclasses import dataclass, field
 from typing import Dict
 from ..asset_base_cfg import AssetBaseCfg

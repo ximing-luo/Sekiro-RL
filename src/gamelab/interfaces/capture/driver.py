@@ -1,13 +1,3 @@
-"""
-模块用途：摄像头采集与帧入缓冲的后台管理。
-
-包含：
-- 类：FrameCapture（start/stop）
-
-边界：
-- 负责：采集、缩放、写入 ReplayBuffer，并提供 latest_frame
-- 不负责：奖励计算、环境逻辑、训练流程
-"""
 import threading
 import time
 import ctypes

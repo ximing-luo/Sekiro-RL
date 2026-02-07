@@ -1,12 +1,3 @@
-'''
-Description: 
-Version: 2.0
-Autor: Zhang
-Date: 2021-11-16 10:37:59
-LastEditors: Zhang
-LastEditTime: 2021-12-08 22:50:57
-'''
-
 import torch
 import torch.nn as nn
 import torchvision.models as models

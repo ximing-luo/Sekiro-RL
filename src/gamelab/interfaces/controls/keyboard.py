@@ -1,22 +1,3 @@
-"""
-模块用途：底层按键发送与键盘事件封装。
-
-包含：
-- 函数：用于发送虚拟键码的工具方法
-
-边界：
-- 负责：系统层面的按键注入
-- 不负责：动作语义、环境逻辑与训练
-"""
-'''
-Description: 
-Version: 2.0
-Autor: Zhang
-Date: 2021-11-14 15:08:58
-LastEditors: Zhang
-LastEditTime: 2021-12-04 15:02:57
-'''
-
 import ctypes
 import threading
 
