@@ -6,7 +6,7 @@ import numpy as np
 from collections import deque
 from src.tasks.registration import task_registry
 import src.tasks.sekiro # 确保 Sekiro 任务已注册
-from src.framework.ashina.agents.dqn_agent import DQNAgent
+from src.framework.ashina.highlevel import DQNAgent
 from src.gamelab.interfaces.system.input import key_check
 import configs.config as config
 

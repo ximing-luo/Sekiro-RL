@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from src.framework.ashina.models.resnet import BasicBlock, BottleNeck
+from src.models.resnet import BasicBlock, BottleNeck
 
 class SEBlock(nn.Module):
     """

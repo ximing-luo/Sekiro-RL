@@ -1,28 +1,28 @@
 import os
 import torch
 import numpy as np
-from src.framework.ashina.common.base_agent import BaseAgent
-from src.framework.ashina.policies.dqn_policy import DQNPolicy
-from src.framework.ashina.trainers.off_policy_trainer import OffPolicyTrainer
+from .base import BaseAgent
+from ..policy import DQNPolicy
+from ..trainer import OffPolicyTrainer
+from ..data.collector import Collector
 from src.models.simple_dqn import ddqn_simple
 import configs.config as config
 
 class DQNAgent(BaseAgent):
     """
     Ashina 框架下的 DQN 代理。
-    作为高层 Facade，协调 Policy, Trainer 和 Buffer。
+    作为高层 Facade，协调 Policy, Collector 和 Trainer。
     """
-    def __init__(self, img_width, img_height, action_dim, buffer, model_file=None, n_step_rewards: int = 1):
+    def __init__(self, env, action_dim, buffer, model_file=None):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         super().__init__(action_dim, device)
         
         self.model_file = model_file or config.MODEL_PATH
-        self.buffer = buffer
         
         # 1. 实例化模型
         self.model = ddqn_simple(in_channels=config.FRAME_HISTORY_LEN, num_actions=action_dim)
         
-        # 2. 实例化策略 (灵魂)
+        # 2. 实例化策略
         self.policy = DQNPolicy(
             model=self.model,
             action_dim=action_dim,
@@ -32,29 +32,15 @@ class DQNAgent(BaseAgent):
             target_update_freq=config.TARGET_UPDATE_FREQ
         )
         
-        # 3. 实例化训练器 (执行)
+        # 3. 实例化 Collector (天授式核心)
+        self.collector = Collector(policy=self.policy, env=env, buffer=buffer)
+        
+        # 4. 实例化训练器
         self.trainer = OffPolicyTrainer(
             policy=self.policy,
-            buffer=buffer,
-            batch_size=config.BATCH_SIZE,
-            n_step=n_step_rewards,
-            gamma=config.GAMMA
+            train_collector=self.collector,
+            batch_size=config.BATCH_SIZE
         )
-
-    def act(self, state, epsilon=0.0):
-        # 处理输入状态
-        if isinstance(state, torch.Tensor):
-            state = state.cpu().numpy()
-            
-        # 期望形状: [k, H, W, C] -> [k*C, H, W]
-        if state.ndim == 4:
-            k, H, W, C = state.shape
-            state = state.transpose(0, 3, 1, 2).reshape(k*C, H, W)
-            
-        return self.policy.get_action(state, epsilon)
-
-    def record(self, state, action, reward, next_state, done):
-        self.buffer.add(state, action, reward, done)
 
     def learn(self):
         return self.trainer.train_step()

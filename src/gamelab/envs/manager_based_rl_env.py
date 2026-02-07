@@ -5,7 +5,7 @@ import gymnasium as gym
 from gymnasium import spaces
 from .manager_based_env import ManagerBasedEnv
 from .manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
-from src.framework.ashina.buffers.replay_buffer import ReplayBuffer
+from src.framework.ashina.data import ReplayBuffer
 from src.gamelab.managers import (
     ActionManager,
     ObservationManager,
