@@ -13,13 +13,10 @@ MOVE_ACTIONS = {
     4: _actions.go_right,
 }
 
-# 动作头 B (动作/技能): [无, 攻击, 防御, 垫步, 跳跃]
+# 动作头 B (动作/技能): [无, 防御, 垫步]
 SKILL_ACTIONS = {
     0: _actions.no_op,
-    1: _actions.attack,
-    2: _actions.defense,
-    3: _actions.dodge_forward,
-    4: _actions.jump,
+    1: _actions.defense
 }
 
 MULTI_DISCRETE_DIMS = [len(MOVE_ACTIONS), len(SKILL_ACTIONS)]
@@ -63,7 +60,7 @@ ACTION_LABELS = ['无操作', '攻击', '防御', '跳跃', '闪避', '忍义手
 # Multi-Discrete 标签定义
 MULTI_DISCRETE_LABELS = [
     ['不动', '前移', '后移', '左移', '右移'], # 移动头
-    ['无', '攻击', '防御', '垫步', '跳跃']   # 动作/技能头
+    ['无', '防御', '垫步']   # 动作/技能头
 ]
 MULTI_DISCRETE_HEAD_NAMES = ['Move', 'Skill']
 

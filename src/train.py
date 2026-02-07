@@ -28,10 +28,10 @@ def main():
     parser.add_argument("--task", type=str, default="Sekiro-v0", help="要训练的任务 ID")
     parser.add_argument("--steps", type=int, default=100000, help="总训练时间步数")
     parser.add_argument("--save_freq", type=int, default=10000, help="模型保存频率 (steps)")
-    parser.add_argument("--lr", type=float, default=1e-4, help="大幅降低学习率以稳定训练 (原 5e-4)")
-    parser.add_argument("--batch_size", type=int, default=128, help="适度增加批大小以提高梯度稳定性")
+    parser.add_argument("--lr", type=float, default=1e-5, help="大幅降低学习率以稳定训练 (原 5e-4)")
+    parser.add_argument("--batch_size", type=int, default=64, help="适度增加批大小以提高梯度稳定性")
     parser.add_argument("--n_steps", type=int, default=2048, help="PPO 采集步数")
-    parser.add_argument("--aux_coef", type=float, default=0.15, help="特征余弦相似度辅助损失权重")
+    parser.add_argument("--aux_coef", type=float, default=0.05, help="特征余弦相似度辅助损失权重")
     parser.add_argument("--checkpoint", type=str, default='None', help="断点模型路径 (例如 models/ppo_checkpoints/sekiro_ppo_10000_steps.zip)")
     
     args = parser.parse_args()
@@ -96,8 +96,9 @@ def main():
             learning_rate=args.lr,
             batch_size=args.batch_size,
             n_steps=args.n_steps,
-            n_epochs=10,
-            target_kl=0.02,
+            gamma = 0.95,
+            n_epochs=5,
+            target_kl=0.05,
             ent_coef=0.01, # 增加熵系数，强迫模型探索，防止死锁在“左移”等单一动作
             clip_range=0.5, # 限制策略更新幅度
             clip_range_vf=0.5, # 限制价值函数更新幅度

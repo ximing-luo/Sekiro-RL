@@ -32,13 +32,19 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     })
     
     # 4. 奖励项配置 (Reward Terms)
+    # rewards: dict = field(default_factory=lambda: {
+    #     "player_death": RewardTermCfg(func=mdp.rewards.player_death_reward, weight=0.5), # 最终分: -5.0
+    #     "boss_death": RewardTermCfg(func=mdp.rewards.boss_death_reward, weight=1.0), # 最终分: +10.0
+    #     "player_health": RewardTermCfg(func=mdp.rewards.player_health_reward, weight=0.2), # 100伤害 = -0.2
+    #     "boss_health": RewardTermCfg(func=mdp.rewards.boss_health_reward, weight=0.4), # 100伤害 = +0.4
+    #     "player_stamina": RewardTermCfg(func=mdp.rewards.player_stamina_reward, weight=0.2), # 100上涨 = -0.2
+    #     "boss_stamina": RewardTermCfg(func=mdp.rewards.boss_stamina_reward, weight=0.5), # 100下降 = +0.5
+    #     "survival": RewardTermCfg(func=mdp.rewards.survival_reward, weight=0.2), # 动作/时间正则化
+    # })
+
     rewards: dict = field(default_factory=lambda: {
-        "player_death": RewardTermCfg(func=mdp.rewards.player_death_reward, weight=0.5), # 最终分: -5.0
-        "boss_death": RewardTermCfg(func=mdp.rewards.boss_death_reward, weight=1.0), # 最终分: +10.0
         "player_health": RewardTermCfg(func=mdp.rewards.player_health_reward, weight=0.2), # 100伤害 = -0.2
-        "boss_health": RewardTermCfg(func=mdp.rewards.boss_health_reward, weight=0.4), # 100伤害 = +0.4
-        "player_stamina": RewardTermCfg(func=mdp.rewards.player_stamina_reward, weight=0.2), # 100上涨 = -0.2
-        "boss_stamina": RewardTermCfg(func=mdp.rewards.boss_stamina_reward, weight=0.5), # 100下降 = +0.5
+        "boss_stamina": RewardTermCfg(func=mdp.rewards.boss_stamina_reward, weight=0.3), # 100下降 = +0.5
         "survival": RewardTermCfg(func=mdp.rewards.survival_reward, weight=0.2), # 动作/时间正则化
     })
     

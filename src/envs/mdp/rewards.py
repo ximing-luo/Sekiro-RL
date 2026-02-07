@@ -88,7 +88,7 @@ def boss_stamina_reward(env, prev_metrics, next_metrics, action, events, **kwarg
     # 3. 进度奖：Boss 架势条越满（数值越低），奖励越高 (微弱持续奖励)
     # 只狼中架势值减小代表进度增加
     posture_build_up_bonus = (1.0 - (curr_stamina / max_stamina)) * 0.01
-    reward += posture_build_up_bonus
+    # reward += posture_build_up_bonus
     # 1. 瞬时奖励：架势条正在减少（被攻击或被格挡）
     if 7 in events:
         prev_stamina = prev_metrics.get('telemetry', {}).get('boss_stamina', 0)
@@ -97,8 +97,8 @@ def boss_stamina_reward(env, prev_metrics, next_metrics, action, events, **kwarg
             # 纲量统一：100 伤害对应 1.0 原始分
             reward += stamina_diff * 0.01 
             _log(f"\033[93mBoss架势奖励: reward: {reward:.2f}, 伤害: {stamina_diff}, 引导分: {posture_build_up_bonus:.4f}\033[0m")
-        if -1000 < stamina_diff < -10: # 回躯干惩罚
-            reward += stamina_diff * 0.001
+        # if -1000 < stamina_diff < -10: # 回躯干惩罚
+        #     reward += stamina_diff * 0.001
     return reward
 
 def survival_reward(env, action, **kwargs):
@@ -118,20 +118,14 @@ def survival_reward(env, action, **kwargs):
     # 1. 移动头 (0:不动, 1-4:移动)
     # 鼓励积极移动
     if move_idx != 0:
-        reward -= 0.01
+        reward -= 0.05
         
-    # 2. 动作/技能头 (0:无, 1:攻击, 2:防御, 3:垫步, 4:跳跃)
-    if skill_idx == 1: # 攻击
-        reward -= 0.02
-    elif skill_idx == 2: # 防御 (保持 0 成本，鼓励防御)
-        reward -= 0.0
-    elif skill_idx == 3: # 垫步
-        reward -= 0.02
-    elif skill_idx == 4: # 跳跃
-        reward -= 0.03
+    # 2. 动作/技能头 (0:无, 1:防御, 2:垫步)
+    if skill_idx == 1: # 防御 (保持 0 成本，鼓励防御)
+        reward -= 0.05
     
     # 3. 基础耗时惩罚 (底噪)
-    reward -= 0.02
+    # reward -= 0.02
     
     # 4. 保持量纲：除以动作头的个数 (现在是 2)
     return reward / num_heads
