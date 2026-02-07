@@ -4,12 +4,12 @@ import time
 import argparse
 
 # 将项目根目录添加到 sys.path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 import src.gamelab.interfaces.system.window as window_utils
-from src.framework.sb3.runners import init_env_agent, wait_buffer, SekiroRunner
+from src.gamelab.rl.runners import init_env_agent, wait_buffer, SekiroRunner
 import configs.config as config
 
 def main():

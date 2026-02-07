@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from collections import deque
-from src.framework.sb3.policies.buffers.base import BaseBuffer
+from src.framework.ashina.buffers.base import BaseBuffer
 import configs.config as config
 
 class ReplayBuffer(BaseBuffer):

@@ -4,8 +4,8 @@ import os
 
 class BaseAgent(ABC):
     """
-    RL 代理基类，定义了算法的标准接口。
-    借鉴了 Stable-Baselines3 和 SKRL 的设计理念。
+    高层代理基类，作为框架的对外统一接口。
+    它负责协调 Policy, Buffer 和 Collector。
     """
     def __init__(self, action_dim, device="cuda"):
         self.action_dim = action_dim

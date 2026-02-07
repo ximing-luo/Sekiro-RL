@@ -11,8 +11,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
-a = models.AlexNet()
-
 # nn.Conv2d 参数说明（本文件大量使用）：
 # - in_channels：输入特征图的通道数（C_in）
 # - out_channels：输出特征图的通道数（C_out）

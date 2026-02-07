@@ -63,7 +63,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     # 允许在不修改 train.py 的情况下，通过配置挂载不同的观察/诊断工具
     callbacks: list = field(default_factory=lambda: [
         {
-            "class": "src.framework.sb3.callbacks.SekiroCombinedCallback",
+            "class": "src.gamelab.rl.sb3_callbacks.SekiroCombinedCallback",
             "params": {"log_interval": 1000}
         }
     ])

@@ -6,7 +6,7 @@ import numpy as np
 from collections import deque
 from src.tasks.registration import task_registry
 import src.tasks.sekiro # 确保 Sekiro 任务已注册
-from src.framework.sb3.policies.dqn_agent import DQNAgent
+from src.framework.ashina.agents.dqn_agent import DQNAgent
 from src.gamelab.interfaces.system.input import key_check
 import configs.config as config
 
@@ -52,7 +52,7 @@ def maybe_print(step, recent_rewards, last_print_time):
         return time.time()
     return last_print_time
 
-from src.framework.utils.import_utils import import_class
+from src.utils.import_utils import import_class
 
 class Runner:
     """

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import os
 from stable_baselines3.common.callbacks import BaseCallback
-from src.framework.sb3.tensorboard import TensorboardHookManager
+from src.gamelab.rl.tensorboard import TensorboardHookManager
 
 class SekiroCombinedCallback(BaseCallback):
     """

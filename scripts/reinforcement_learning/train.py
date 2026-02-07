@@ -10,7 +10,7 @@ from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 
 # 将项目根目录添加到 sys.path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
@@ -18,10 +18,10 @@ import src.gamelab.interfaces.system.window as window_utils
 from src.tasks.registration import task_registry
 import src.tasks.sekiro  # 触发注册
 import configs.config as config
-from src.framework.sb3.policies.ppo_aux import AuxPPO
+from src.framework.sb3.ppo_aux import AuxPPO
 from src.gamelab.envs.mdp.actions import ACTION_LABELS
-from src.model.ppo_models import SekiroStableExtractor
-from src.framework.utils.import_utils import import_class
+from src.models.ppo_models import SekiroStableExtractor
+from src.utils.import_utils import import_class
 
 def main():
     parser = argparse.ArgumentParser(description="Sekiro-RL PPO 训练入口 (Isaac Lab 风格)")
