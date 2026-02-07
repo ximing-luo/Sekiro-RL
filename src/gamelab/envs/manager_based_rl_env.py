@@ -1,134 +1,99 @@
-import time
+from __future__ import annotations
 import torch
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
+from typing import Dict, Any, Sequence
+
 from .manager_based_env import ManagerBasedEnv
 from .manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
-from src.framework.ashina.data import ReplayBuffer
-from src.gamelab.managers import (
-    ActionManager,
-    ObservationManager,
-    RewardManager,
-    TerminationManager,
-    LogManager
-)
 
 class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
     """
     基于管理器的强化学习环境类。
     符合 Gymnasium 接口标准：step(), reset()。
-    通过配置驱动所有的管理器。
+    
+    对标 Isaac Lab 的 ManagerBasedRLEnv。
     """
-    def __init__(self, cfg: ManagerBasedRLEnvCfg):
-        super().__init__(cfg)
-        
-        # 1. 实例化管理器 (传入配置中的 Terms)
-        self.action_manager = ActionManager(cfg.actions)
-        self.observation_manager = ObservationManager(cfg.observations)
-        self.reward_manager = RewardManager(cfg.rewards)
-        self.termination_manager = TerminationManager(cfg.terminations)
-        self.log_manager = LogManager()
-        
-        # 3. 启动场景
+    def __init__(self, cfg: ManagerBasedRLEnvCfg, render_mode: str | None = None):
+        # 1. 调用父类初始化管理器和仿真
+        super().__init__(cfg, render_mode)
         self._setup_managers()
+        
+        # 2. 定义 Gymnasium 空间 (基于管理器提供的信息)
+        self._configure_spaces()
 
-        # 4. 定义 Gymnasium 空间
-        # 动作空间：支持离散或多维离散
-        dims = self.action_manager.get_action_dim()
-        if isinstance(dims, (list, tuple, np.ndarray)):
-            self.action_space = spaces.MultiDiscrete(dims)
-        else:
-            self.action_space = spaces.Discrete(dims)
+    def _configure_spaces(self):
+        """根据管理器配置自动推导动作和观测空间。"""
+        # A. 动作空间
+        # 目前假设是 MultiDiscrete (只狼常用)
+        # TODO: 根据 ActionManager 的具体类型动态判断
+        self.action_space = spaces.MultiDiscrete(self.action_manager.action_term_dim)
         
-        # 观测空间：图像 (C, H, W)
-        self.observation_space = spaces.Box(
-            low=0, 
-            high=255, 
-            shape=(3, cfg.scene.observation_h, cfg.scene.observation_w), 
-            dtype=np.uint8
+        # B. 观测空间 (目前支持 Dict 模式以适配图像+遥测)
+        obs_dict = {}
+        # 图像空间
+        obs_dict["image"] = spaces.Box(
+            low=0, high=1.0, 
+            shape=(3, self.cfg.scene.observation_h, self.cfg.scene.observation_w), 
+            dtype=np.float32
         )
-        
-        # 状态记录
-        self.last_metrics = None
-        self.over = False
-        self.last_total_reward_raw = 0.0
-        self.last_events = []
-        self.last_events_feedback = []
+        # 遥测空间 (10个归一化指标)
+        obs_dict["telemetry"] = spaces.Box(
+            low=-100.0, high=100.0, 
+            shape=(10,), 
+            dtype=np.float32
+        )
+        self.observation_space = spaces.Dict(obs_dict)
 
     @property
     def action_dim(self):
-        """兼容性属性：返回动作空间维度。"""
-        return self.action_manager.get_action_dim()
+        """兼容性属性：返回动作空间总维度。"""
+        return sum(self.action_manager.action_term_dim)
 
-    def step(self, action):
-        """
-        标准 RL 步进逻辑。
-        返回: (obs, reward, terminated, truncated, info)
-        """
-        # 0. 处理暂停逻辑 (让 'T' 键在 PPO 循环中依然有效)
-        self.pause_game(False)
-
-        # 1. 执行动作
-        self.action_manager.apply_action(self, action)
-
-        # 2. 获取新观测指标
-        next_metrics = self.observation_manager.compute_observations(self)
-        if self.last_metrics is None:
-            self.last_metrics = next_metrics
-
-        # 2.5 更新可视化 (如果有开启)
-        frame = next_metrics.get('policy')
-        if frame is not None:
-            # 如果 frame 是 CHW 格式，转换为 HWC 供 cv2 可视化
-            display_frame = frame
-            if frame.ndim == 3 and frame.shape[0] == 3:
-                display_frame = frame.transpose(1, 2, 0)
-            self.scene_manager.update_debug_visualization(display_frame)
-
-        # 3. 检测事件并计算奖励
-        events = self.reward_manager.detect_events(self.last_metrics, next_metrics)
-        reward, components = self.reward_manager.compute_reward(self, self.last_metrics, next_metrics, action, events)
-
-        # 4. 判断终止条件
-        terminated = self.termination_manager.check_termination(self, self.last_metrics, next_metrics, events)
-        truncated = False # 目前暂无超时截断逻辑
-
-        # 5. 更新状态记录
-        self.last_total_reward_raw = float(reward)
-        self.last_events = list(events)
-        self.last_events_feedback = [[name, float(val)] for name, val in components.items()]
-        self.last_metrics = next_metrics
-
-        # 7. 构造 info 字典
-        info = {
-            "metrics": next_metrics,
-            "events": events,
-            "reward_components": components
-        }
-
-        # 8. 返回符合空间的观测值 (优先返回 policy 图像)
-        obs = next_metrics.get('policy')
-        if obs is None:
-            obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
-
-        return obs, float(reward), terminated, truncated, info
-
-    def reset(self, seed=None, options=None):
-        """
-        重置环境状态。
-        返回: (obs, info)
-        """
-        super().reset(seed=seed) # 遵循 Gymnasium 标准处理 seed
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[Dict, Dict]:
+        """Gymnasium 标准重置。"""
+        # 遵循 Gymnasium 标准处理 seed (虽然目前 sim 不支持 seed)
+        super().reset() # 调用 ManagerBasedEnv.reset
         
-        self.last_metrics = self.observation_manager.compute_observations(self)
-        self.termination_manager.reset()
-        self.over = False
+        # 获取初始观测并扁平化组 (目前只支持 policy 组)
+        obs_raw = self.observation_manager.compute_observations()
+        obs = self._process_obs(obs_raw)
         
-        # 直接从 metrics 中获取图像 (源头已处理为 CHW)
-        obs = self.last_metrics.get('policy')
-        if obs is None:
-            obs = np.zeros(self.observation_space.shape, dtype=np.uint8)
+        return obs, {}
+
+    def step(self, action: torch.Tensor | np.ndarray) -> tuple[Dict, float, bool, bool, Dict]:
+        """Gymnasium 标准步进。"""
+        # 确保 action 是 Tensor
+        if isinstance(action, (np.ndarray, list)):
+            action = torch.as_tensor(action, device=self.device)
             
-        info = {"metrics": self.last_metrics}
-        return obs, info
+        # 调用 ManagerBasedEnv.step
+        obs_raw, reward, terminated, truncated, info = super().step(action)
+        
+        # 处理观测
+        obs = self._process_obs(obs_raw)
+        
+        # 转换为标量 (SB3 期望标量奖励)
+        reward_scalar = float(reward.item())
+        done = bool(terminated.item())
+        trunc = bool(truncated.item())
+        
+        return obs, reward_scalar, done, trunc, info
+
+    def _process_obs(self, obs_raw: Dict) -> Dict:
+        """从 ObservationManager 的原始输出中提取并转换格式。"""
+        # 目前主要关注 'policy' 组
+        policy_group = obs_raw.get("policy", {})
+        
+        # 将 Tensor 转换为 Numpy (Gym 要求)
+        processed = {}
+        for k, v in policy_group.items():
+            if isinstance(v, torch.Tensor):
+                # 如果是单环境，移除 batch 维 (Gym 期望单实例观测)
+                if v.shape[0] == 1:
+                    v = v.squeeze(0)
+                processed[k] = v.detach().cpu().numpy()
+            else:
+                processed[k] = v
+        return processed

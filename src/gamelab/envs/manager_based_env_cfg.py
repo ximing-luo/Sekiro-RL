@@ -1,47 +1,39 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable
+from src.gamelab.managers.manager_term_cfg import (
+    ObservationGroupCfg,
+    ActionTermCfg,
+    EventTermCfg,
+    RewardTermCfg,
+    TerminationTermCfg,
+    CommandTermCfg,
+    RecorderTermCfg
+)
 
-@dataclass
-class ManagerTermCfg:
-    """基础项配置类，对应 Isaac Lab 中的 ManagerTermCfg。"""
-    func: Callable  # 处理逻辑的函数
-    params: Dict[str, Any] = field(default_factory=dict)  # 函数参数
-
-@dataclass
-class RewardTermCfg(ManagerTermCfg):
-    """奖励项配置。"""
-    weight: float = 1.0  # 奖励权重
-
-@dataclass
-class ObservationTermCfg(ManagerTermCfg):
-    """观测项配置。"""
-    # 可以在此扩展如 noise, clip 等配置
-    pass
-
-@dataclass
-class TerminationTermCfg(ManagerTermCfg):
-    """终止项配置。"""
-    is_terminal: bool = True  # 是否触发回合结束
-
-@dataclass
-class ActionTermCfg(ManagerTermCfg):
-    """动作项配置。"""
-    pass
+from src.gamelab.assets.asset_base_cfg import AssetBaseCfg
 
 @dataclass
 class SceneCfg:
+    """环境场景配置，对标 Isaac Lab 的 InteractiveSceneCfg。"""
+    num_envs: int = 1
     observation_w: int = 640
     observation_h: int = 360
     pos: str = "offscreen"
     capture_fps: int = 60
     debug_vis_fps: int = 0
+    # 资产列表
+    assets: Dict[str, AssetBaseCfg] = field(default_factory=dict)
 
 @dataclass
 class ManagerBasedEnvCfg:
     """基础管理器驱动环境配置。"""
     scene: SceneCfg = field(default_factory=SceneCfg)
     # 管理器配置项（默认为空，由子类或任务配置填充）
-    observations: Dict[str, ObservationTermCfg] = field(default_factory=dict)
+    observations: Dict[str, ObservationGroupCfg] = field(default_factory=dict)
     actions: Dict[str, ActionTermCfg] = field(default_factory=dict)
+    events: Dict[str, EventTermCfg] = field(default_factory=dict)
     rewards: Dict[str, RewardTermCfg] = field(default_factory=dict)
     terminations: Dict[str, TerminationTermCfg] = field(default_factory=dict)
+    commands: Dict[str, CommandTermCfg] = field(default_factory=dict)
+    recorders: Dict[str, RecorderTermCfg] = field(default_factory=dict)
+    curriculums: Dict[str, Any] = field(default_factory=dict)

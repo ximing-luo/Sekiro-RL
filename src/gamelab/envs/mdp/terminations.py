@@ -1,16 +1,17 @@
 """
-模块用途：原子终止条件定义（Termination Terms）。
+通用原子终止条件库。
 """
 
-def player_dead_termination(env, events, **kwargs):
-    """自身死亡导致回合结束。"""
-    return 0 in events
+def time_out_termination(env, **kwargs) -> bool:
+    """
+    基于步数的超时终止。
+    """
+    if hasattr(env, "step_count") and hasattr(env.cfg, "max_episode_steps"):
+        return env.step_count >= env.cfg.max_episode_steps
+    return False
 
-def boss_dead_termination(env, events, **kwargs):
-    """Boss 死亡导致回合结束。"""
-    return 1 in events
-
-def time_out_termination(env, **kwargs):
-    """超时终止（如果环境中有步数限制）。"""
-    # 暂时作为占位符，如果 env 有 max_episode_steps 可以增加逻辑
+def illegal_state_termination(env, **kwargs) -> bool:
+    """
+    检测到非法状态（如数值异常）时强制终止。
+    """
     return False

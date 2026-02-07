@@ -1,76 +1,76 @@
-from typing import Dict, List, Any
-from src.gamelab.envs.manager_based_env_cfg import RewardTermCfg
+from __future__ import annotations
+import torch
+from typing import TYPE_CHECKING, Dict, List, Any, Sequence
+from .manager_base import ManagerBase
+from .manager_term_cfg import RewardTermCfg
 
-class RewardManager:
+if TYPE_CHECKING:
+    from src.gamelab.envs.manager_based_env import ManagerBasedEnv
+
+class RewardManager(ManagerBase):
+    """奖励管理器：实现基于术语（Term-based）的奖励计算。
+    
+    对标 Isaac Lab，支持 Tensor 化的奖励计算和 Episode 累加。
     """
-    奖励管理器：实现基于术语（Term-based）的奖励计算。
-    遵循 Isaac Lab 风格，不再包含硬编码逻辑。
-    """
-    def __init__(self, cfg: Dict[str, RewardTermCfg]):
-        self.cfg = cfg
+    def __init__(self, cfg: Dict[str, RewardTermCfg], env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+        
+        # 初始化缓存
+        self._reward_buf = torch.zeros(self.num_envs, device=self.device)
+        self._term_names = list(self.cfg.keys())
+        
+        # 记录每个 Term 的 Episode 累积奖励
+        self._episode_sums = {
+            name: torch.zeros(self.num_envs, device=self.device) 
+            for name in self._term_names
+        }
 
-    def detect_events(self, prev_metrics, next_metrics):
-        """
-        根据状态变化检测发生的事件。
-        """
-        events = []
-        # 从嵌套的 telemetry 字典中提取指标
-        prev_tel = prev_metrics.get('telemetry', {})
-        next_tel = next_metrics.get('telemetry', {})
-        
-        sb, nsb = prev_tel.get('self_blood', 0), next_tel.get('self_blood', 0)
-        bb, nbb = prev_tel.get('boss_blood', 0), next_tel.get('boss_blood', 0)
-        ss, nss = prev_tel.get('self_stamina', 0), next_tel.get('self_stamina', 0)
-        bs, nbs = prev_tel.get('boss_stamina', 0), next_tel.get('boss_stamina', 0)
-        pd, npd = prev_tel.get('player_deaths', 0), next_tel.get('player_deaths', 0)
-        ed, ned = prev_tel.get('enemy_deaths', 0), next_tel.get('enemy_deaths', 0)
-        sbm = prev_tel.get('self_blood_max', 0)
-        bbm = prev_tel.get('boss_blood_max', 0)
-        ssm = prev_tel.get('self_stamina_max', 0)
-        bsm = prev_tel.get('boss_stamina_max', 0)
-        
-        # 0: 自身死亡, 1: Boss死亡, 2: 自身掉血, 3: 自身回血, 4: 自身血量过低, 
-        # 5: Boss掉血, 6: 自身架势恶化(数值减小), 7: Boss架势恶化(数值减小), 8: Boss架势过低(可忍杀)
-        
-        # 自身死亡：死亡计数增加
-        if npd - pd == 1:
-            events.append(0)
-            print(f"\033[91m自身死亡检测：死亡计数从 {pd} 增加到 {npd}\033[0m")
-        # Boss死亡：死亡计数增加
-        if ned - ed == 1:
-            events.append(1)
-            print(f"\033[91mBoss死亡检测：死亡计数从 {ed} 增加到 {ned}\033[0m")
-        
-        # 自身掉血
-        if nsb < sb: events.append(2)
-        # Boss掉血（有效攻击）
-        if nbb != bb: events.append(5)
-        # 自身架势恶化：只狼架势条是向下扣的，数值减小代表架势条变长/变黄
-        if nss != ss: events.append(6)
-        # 自身架势崩溃
-        if ss <= 30 and nss == ssm: events.append(8)
-        # Boss架势变化：数值减小代表 Boss 快被破防了
-        if nbs != bs: events.append(7)
-        return events
+    @property
+    def active_terms(self) -> List[str]:
+        return self._term_names
 
-    def compute_reward(self, env, prev_metrics, next_metrics, action, events):
-        """遍历配置中的所有奖励项并累加。"""
-        total_reward = 0.0
-        components = {}
+    def _prepare_terms(self):
+        # 可以在这里预处理 term 函数，检查合法性等
+        pass
 
+    def compute_reward(self, prev_metrics: Any, next_metrics: Any, action: Any, events: List[int]) -> torch.Tensor:
+        """计算并返回总奖励。"""
+        self._reward_buf.zero_()
+        
         for name, term_cfg in self.cfg.items():
-            # 调用 term 函数
+            # 计算奖励项原始值
+            # 这里的 func 应该返回一个 (num_envs,) 的 tensor
             val = term_cfg.func(
-                env=env,
+                env=self._env,
                 prev_metrics=prev_metrics,
                 next_metrics=next_metrics,
                 action=action,
                 events=events,
                 **term_cfg.params
             )
-            # 应用权重
+            
+            # 确保是 tensor
+            if not isinstance(val, torch.Tensor):
+                val = torch.tensor(val, device=self.device).repeat(self.num_envs)
+                
             weighted_val = val * term_cfg.weight
-            total_reward += weighted_val
-            components[name] = weighted_val
+            self._reward_buf += weighted_val
+            
+            # 更新累积值
+            self._episode_sums[name] += weighted_val
+            
+        return self._reward_buf.clone()
 
-        return total_reward, components
+    def reset(self, env_ids: Sequence[int] | None = None):
+        """重置指定环境的累积奖励。"""
+        if env_ids is None:
+            for buf in self._episode_sums.values():
+                buf.zero_()
+        else:
+            for buf in self._episode_sums.values():
+                buf[env_ids] = 0.0
+        return {}
+
+    def get_episode_sums(self) -> Dict[str, torch.Tensor]:
+        """获取当前 Episode 的奖励统计。"""
+        return self._episode_sums

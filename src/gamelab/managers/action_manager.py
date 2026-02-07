@@ -1,26 +1,63 @@
+from __future__ import annotations
+import torch
 import threading
-from typing import Dict
-from src.gamelab.envs.manager_based_env_cfg import ActionTermCfg
+from typing import TYPE_CHECKING, Dict, List, Any, Sequence
+from .manager_base import ManagerBase
+from .manager_term_cfg import ActionTermCfg
 
-class ActionManager:
-    """
-    动作管理器：实现基于术语的动作执行。
-    """
-    def __init__(self, cfg: Dict[str, ActionTermCfg]):
-        self.cfg = cfg
-        # 目前 Sekiro 主要是离散动作空间，从第一个 Term 获取映射
-        # 未来可以支持多个 Action Term 组合
-        self.action_term = list(cfg.values())[0] if cfg else None
+if TYPE_CHECKING:
+    from src.gamelab.envs.manager_based_env import ManagerBasedEnv
 
-    def apply_action(self, env, action):
-        """执行动作。"""
-        if self.action_term:
-            # 获取动作函数并异步执行
-            fn = self.action_term.func(action, **self.action_term.params)
+class ActionManager(ManagerBase):
+    """动作管理器：实现基于术语的动作执行。
+    
+    继承自 ManagerBase，支持多动作项分发。
+    """
+    def __init__(self, cfg: Dict[str, ActionTermCfg], env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+        self._term_names = list(self.cfg.keys())
+
+    @property
+    def active_terms(self) -> List[str]:
+        return self._term_names
+
+    def _prepare_terms(self):
+        pass
+
+    def apply_action(self, action: torch.Tensor):
+        """执行动作。
+        
+        如果 action 是 tensor，则根据配置将其分发给对应的 Term。
+        目前假设 action 的第一维是环境数量，第二维是动作空间。
+        """
+        # 简单起见，目前仍优先处理第一个 Term
+        if self._term_names:
+            term_name = self._term_names[0]
+            term_cfg = self.cfg[term_name]
+            
+            # 获取动作函数。注意：action[0] 取第一个环境的动作，因为目前只支持单环境执行
+            # 未来需要处理并行环境下的物理输入模拟
+            fn = term_cfg.func(action[0], **term_cfg.params)
+            
+            # 异步执行按键模拟
             threading.Thread(target=fn, daemon=True).start()
 
-    def get_action_dim(self):
-        # 优先检查 dims (MultiDiscrete)，其次检查 dim (Discrete)
-        if 'dims' in self.action_term.params:
-            return self.action_term.params['dims']
-        return self.action_term.params.get('dim', 0) if self.action_term else 0
+    def reset(self, env_ids: Sequence[int] | None = None):
+        return {}
+
+    @property
+    def action_term_dim(self) -> List[int]:
+        """返回动作项的维度列表。"""
+        dims = self.get_action_dim()
+        if isinstance(dims, int):
+            return [dims]
+        return list(dims)
+
+    def get_action_dim(self) -> int | List[int]:
+        """获取动作维度。"""
+        if self._term_names:
+            term_cfg = self.cfg[self._term_names[0]]
+            if 'dims' in term_cfg.params:
+                return term_cfg.params['dims']
+            return term_cfg.params.get('dim', 0)
+        return 0

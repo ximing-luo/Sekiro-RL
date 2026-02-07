@@ -12,16 +12,23 @@ if project_root not in sys.path:
 
 from src.gamelab.envs.manager_based_rl_env import ManagerBasedRLEnv
 from src.tasks.sekiro.sekiro_env_cfg import SekiroEnvCfg
+from src.gamelab.sim.sensors.memory_sensor import MemorySensor
+from src.gamelab.assets.sekiro.telemetry import SekiroTelemetry
 
 class Sekiro(ManagerBasedRLEnv):
     """
     只狼任务环境类。
-    由配置驱动，基类负责大部分调度工作。
+    对标 Isaac Lab 的 Task 模式，负责组装特定的传感器。
     """
     def __init__(self, cfg: SekiroEnvCfg = None):
         if cfg is None:
             cfg = SekiroEnvCfg()
         super().__init__(cfg)
+
+    def _setup_managers(self):
+        """扩展基类的初始化。"""
+        # 调用基类完成通用初始化 (如 VisionSensor, InteractiveScene assets)
+        super()._setup_managers()
 
     def step(self, action):
         """执行一步并返回奖励。"""
@@ -29,8 +36,8 @@ class Sekiro(ManagerBasedRLEnv):
 
     def render_debug(self, seq_np):
         """更新调试可视化输入。"""
-        if self.scene_manager:
-            self.scene_manager.update_debug_visualization(seq_np)
+        if hasattr(self, '_input_vis_runner') and self._input_vis_runner:
+            self._input_vis_runner.update(seq_np)
 
 if __name__ == '__main__':
     # 测试代码

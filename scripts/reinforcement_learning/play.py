@@ -8,8 +8,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-import src.gamelab.interfaces.system.window as window_utils
-from src.gamelab.rl.runners import init_env_agent, wait_buffer, SekiroRunner
+import src.gamelab.interfaces.window_utils as window_utils
+from src.gamelab.app.runners import init_env_agent, wait_buffer, SekiroRunner
 import configs.config as config
 
 def main():

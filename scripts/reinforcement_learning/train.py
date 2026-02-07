@@ -14,12 +14,12 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-import src.gamelab.interfaces.system.window as window_utils
+import src.gamelab.interfaces.window_utils as window_utils
 from src.tasks.registration import task_registry
 import src.tasks.sekiro  # 触发注册
 import configs.config as config
 from src.framework.sb3.ppo_aux import AuxPPO
-from src.gamelab.envs.mdp.actions import ACTION_LABELS
+from src.tasks.sekiro.mdp.actions import ACTION_LABELS
 from src.models.ppo_models import SekiroStableExtractor
 from src.utils.import_utils import import_class
 
