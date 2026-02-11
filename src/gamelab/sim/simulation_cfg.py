@@ -8,7 +8,7 @@ class SimulationCfg:
     对标 Isaac Lab 的 SimulationCfg，针对实时游戏环境进行了适配。
     """
     
-    ddgsggadt: float = 1.0 / 60.0
+    dt: float = 1.0 / 60.0
     """仿真步长（秒）。默认为 60Hz。"""
     
     device: str = "cuda:0"
