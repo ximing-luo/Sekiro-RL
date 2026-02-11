@@ -1,7 +1,6 @@
 from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING, Sequence, Dict, Any
-from collections import deque, Counter
 
 from ..asset_base import AssetBase
 from .sekiro_asset_data import SekiroAssetData
@@ -26,14 +25,6 @@ class SekiroAsset(AssetBase):
         
         # 初始化数据容器 (目前固定为 1 个环境，支持未来扩展)
         self._data = SekiroAssetData(num_envs=1, device=self.cfg.device)
-        
-        # 数据平滑缓冲区 (对标 telemetry.py)
-        self._raw_keys = [
-            "player_hp", "player_hp_max", "player_posture", "player_posture_max",
-            "enemy_hp", "enemy_hp_max", "enemy_posture", "enemy_posture_max",
-            "player_deaths", "enemy_deaths"
-        ]
-        self._buffers = {key: deque(maxlen=10) for key in self._raw_keys}
         
         self._initialize_driver()
 
@@ -81,18 +72,10 @@ class SekiroAsset(AssetBase):
             "enemy_deaths": self._read_r32(56),
         }
 
-        # 2. 众数滤波平滑处理
-        filtered_data = {}
-        for key, value in raw_values.items():
-            self._buffers[key].append(value)
-            filtered_data[key] = Counter(self._buffers[key]).most_common(1)[0][0]
-
-        # 3. 同步到 Tensor 缓冲区
-        self._data.update_from_dict(filtered_data)
+        # 2. 同步到 Tensor 缓冲区
+        self._data.update_from_dict(raw_values)
 
     def reset(self, env_ids: Sequence[int] | None = None):
-        """重置资产状态。对于内存读取类资产，通常只需要清除平滑缓冲区。"""
-        for key in self._buffers:
-            self._buffers[key].clear()
+        """重置资产状态。"""
         # 立即更新一次以获取最新状态
         self.update(0.0)
