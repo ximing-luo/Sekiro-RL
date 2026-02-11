@@ -17,8 +17,8 @@ from src.gamelab.assets.asset_base_cfg import AssetBaseCfg
 class SceneCfg:
     """环境场景配置，对标 Isaac Lab 的 InteractiveSceneCfg。"""
     num_envs: int = 1
-    observation_w: int = 640
-    observation_h: int = 360
+    observation_w: int = None
+    observation_h: int = None
     pos: str = "offscreen"
     capture_fps: int = 60
     debug_vis_fps: int = 0

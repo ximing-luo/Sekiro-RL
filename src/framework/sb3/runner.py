@@ -11,7 +11,7 @@ from stable_baselines3.common.logger import configure
 from src.framework.sb3.ppo_aux import AuxPPO
 from src.models.ppo_models import SekiroMultiInputExtractor
 from src.gamelab.utils.rl.sb3 import SekiroCombinedCallback
-from src.utils.io import dump_yaml, get_git_hash
+from src.utils.import_utils import filter_kwargs
 import configs.config as config
 
 class SB3OnPolicyRunner:
@@ -38,6 +38,7 @@ class SB3OnPolicyRunner:
         )
         
         # 3. 初始化模型
+        self.ppo_kwargs = filter_kwargs(AuxPPO, vars(self.args))
         self._setup_model()
         
         # 4. 挂载回调
@@ -51,33 +52,17 @@ class SB3OnPolicyRunner:
                 checkpoint_path, 
                 env=self.env, 
                 device=self.device,
-                custom_objects={
-                    "learning_rate": self.args.lr,
-                    "n_steps": self.args.n_steps,
-                    "batch_size": self.args.batch_size,
-                    "aux_coef": self.args.aux_coef
-                }
+                custom_objects=self.ppo_kwargs
             )
         else:
             print(f"[INFO] 正在初始化新模型 (设备: {self.device})...")
             self.model = AuxPPO(
                 "MultiInputPolicy",
                 self.env, 
+                verbose=1, # 日志打印级别:0-无输出, 1-进度表, 2-调试
                 policy_kwargs=self.policy_kwargs,
-                learning_rate=self.args.lr,
-                batch_size=self.args.batch_size,
-                n_steps=self.args.n_steps,
-                gamma=self.args.gamma,
-                n_epochs=self.args.n_epochs,
-                target_kl=self.args.target_kl,
-                ent_coef=self.args.ent_coef,
-                clip_range=self.args.clip_range,
-                clip_range_vf=self.args.clip_range_vf,
-                max_grad_norm=self.args.max_grad_norm,
-                aux_coef=self.args.aux_coef,
-                vf_coef=self.args.vf_coef,
-                verbose=1,
-                device=self.device
+                device=self.device,
+                **self.ppo_kwargs
             )
         self.model.set_logger(self.logger)
 

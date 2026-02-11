@@ -1,6 +1,4 @@
 import time
-import sys
-import os
 
 from src.gamelab.interfaces.controls.keyboard import PressKey, ReleaseKey
 from .keys import *

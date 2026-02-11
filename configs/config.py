@@ -16,28 +16,32 @@ class SceneConfig:
 @dataclass(frozen=True)
 class UIConfig:
     """内存映射与 UI 窗口配置。"""
-    blood_window: Tuple[int, int, int, int] = (110, 90, 625, 907)
-    stamina_window: Tuple[int, int, int, int] = (586, 54, 750, 900)
     debug_vis_fps: int = 60
 
 @dataclass(frozen=True)
 class RLConfig:
     """强化学习基础参数。"""
-    frame_history_len: int = 4
-    buffer_size: int = 0 # 设置为 0 以在 PPO 训练中关闭冗余的 ReplayBuffer
-    n_step_rewards: int = 5
 
 @dataclass(frozen=True)
 class TrainConfig:
-    """训练超参数。"""
-    lr: float = 0.0001
-    gamma: float = 0.99
-    batch_size: int = 8
-    micro_batch_size: int = 2
-    grad_clip_norm: float = 10.0
-    optimize_every_steps: int = 5
-    target_update_freq: int = 25
-    save_freq: int = 100
+    """训练超参数 (PPO/SB3)。"""
+    # -- 基础
+    learning_rate: float = 1e-4
+    gamma: float = 0.95
+    batch_size: int = 64
+    save_freq: int = 10000
+    steps: int = 100000
+    # -- PPO 特有
+    n_steps: int = 2048
+    n_epochs: int = 5
+    target_kl: float = 0.05
+    ent_coef: float = 0.01
+    clip_range: float = 0.5
+    clip_range_vf: float = 0.5
+    max_grad_norm: float = 5.0
+    vf_coef: float = 0.8
+    # -- 辅助任务
+    aux_coef: float = 0.05
 
 @dataclass(frozen=True)
 class EpsilonConfig:

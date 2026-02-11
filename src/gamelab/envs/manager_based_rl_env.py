@@ -25,26 +25,42 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
 
     def _configure_spaces(self):
         """根据管理器配置自动推导动作和观测空间。"""
-        # A. 动作空间
-        # 目前假设是 MultiDiscrete (只狼常用)
-        # TODO: 根据 ActionManager 的具体类型动态判断
+        # A. 动作空间 (目前支持 MultiDiscrete)
+        # TODO: 后续可根据 ActionManager 的具体 Term 类型扩展为 Discrete 或 Box
         self.action_space = spaces.MultiDiscrete(self.action_manager.action_term_dim)
         
-        # B. 观测空间 (目前支持 Dict 模式以适配图像+遥测)
+        # B. 观测空间 (通过试运行 compute_observations 动态推导维度)
+        # 这样即使在配置中增删观测项，也不需要手动修改这里的 Box 定义
+        with torch.no_grad():
+            # 确保资产已经初始化，以便获取正确的 shape
+            self.scene.update(0.0)
+            obs_raw = self.observation_manager.compute_observations()
+            
+        # 目前只处理 policy 组，如果需要支持多组观测，可在此扩展
+        policy_group = obs_raw.get("policy", {})
+        if not policy_group:
+            raise ValueError("[ManagerBasedRLEnv] 观测配置中未找到 'policy' 组，无法配置观测空间。")
+
         obs_dict = {}
-        # 图像空间
-        obs_dict["image"] = spaces.Box(
-            low=0, high=1.0, 
-            shape=(3, self.cfg.scene.observation_h, self.cfg.scene.observation_w), 
-            dtype=np.float32
-        )
-        # 遥测空间 (10个归一化指标)
-        obs_dict["telemetry"] = spaces.Box(
-            low=-100.0, high=100.0, 
-            shape=(10,), 
-            dtype=np.float32
-        )
+        for key, value in policy_group.items():
+            # 忽略 batch 维度 [num_envs, ...] -> [...]
+            shape = value.shape[1:]
+            
+            # 针对不同类型的观测设置合理的上下限
+            if key == "image":
+                low, high = 0.0, 1.0
+            elif key == "Telemetry":
+                # 遥测数据等通用项使用无界限，防止硬编码 100 导致的溢出或截断
+                low, high = -np.inf, np.inf
+                
+            obs_dict[key] = spaces.Box(
+                low=low, high=high, 
+                shape=shape, 
+                dtype=np.float32
+            )
+            
         self.observation_space = spaces.Dict(obs_dict)
+        print(f"[ManagerBasedRLEnv] 动态配置观测空间完成: {list(obs_dict.keys())}")
 
     @property
     def action_dim(self):
