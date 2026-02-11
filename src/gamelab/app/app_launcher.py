@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, Optional
 
 from src.tasks.registration import task_registry
+import src.tasks # 确保所有任务都被注册
 
 class AppLauncher:
     """应用程序启动器：负责解析命令行参数并初始化环境。
