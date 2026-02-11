@@ -1,6 +1,6 @@
 import time
 
-from src.gamelab.interfaces.controls.keyboard import PressKey, ReleaseKey
+from src.gamelab.interfaces.input.driver import PressKey, ReleaseKey
 from .keys import *
 
 fps = 60

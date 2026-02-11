@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Sequence, Dict, Any
 
 from ..asset_base import AssetBase
 from .sekiro_asset_data import SekiroAssetData
-from src.gamelab.interfaces.memory.driver import MemoryDriver
+from src.gamelab.interfaces.telemetry.driver import TelemetryDriver
 
 if TYPE_CHECKING:
     from .sekiro_asset_cfg import SekiroAssetCfg
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class SekiroAsset(AssetBase):
     """Sekiro 游戏资产实现。
     
-    负责通过 MemoryDriver 读取游戏内存，并将数据填充到 SekiroAssetData (Tensors) 中。
+    负责通过 TelemetryDriver 读取游戏遥测数据，并将数据填充到 SekiroAssetData (Tensors) 中。
     """
     
     def __init__(self, cfg: SekiroAssetCfg):
@@ -20,7 +20,7 @@ class SekiroAsset(AssetBase):
         self.cfg: SekiroAssetCfg = cfg
         
         # 初始化驱动
-        self.driver = MemoryDriver(self.cfg.process_name)
+        self.driver = TelemetryDriver(self.cfg.process_name)
         self.base_address = None
         
         # 初始化数据容器 (目前固定为 1 个环境，支持未来扩展)

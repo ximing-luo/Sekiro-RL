@@ -1,9 +1,9 @@
 import pymem
 from typing import Optional, List
 
-class MemoryDriver:
+class TelemetryDriver:
     """
-    跨游戏通用的内存读写驱动 (Pymem 封装)。
+    跨游戏通用的遥测数据读取驱动 (Pymem 封装)。
     """
     def __init__(self, process_name: str):
         self.process_name = process_name

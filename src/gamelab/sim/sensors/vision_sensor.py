@@ -1,13 +1,13 @@
 from .base_sensor import BaseSensor
-from src.gamelab.interfaces.capture.driver import FrameCapture
+from src.gamelab.interfaces.vision.driver import VisionDriver
 import numpy as np
 
 class VisionSensor(BaseSensor):
     """
-    视觉传感器：封装画面采集驱动。
+    视觉传感器：封装视觉采集驱动。
     """
     def __init__(self, camera_index, camera_width, camera_height, fps, target_width, target_height):
-        self.driver = FrameCapture(
+        self.driver = VisionDriver(
             camera_index=camera_index,
             camera_width=camera_width,
             camera_height=camera_height,

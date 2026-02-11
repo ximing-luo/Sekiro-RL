@@ -4,7 +4,7 @@ import ctypes
 import cv2
 import numpy as np
 
-class FrameCapture:
+class VisionDriver:
     def __init__(self, camera_index, camera_width, camera_height, fps, target_width, target_height):
         self.camera_index = camera_index
         self.camera_width = camera_width
@@ -60,7 +60,7 @@ class FrameCapture:
                 pass
 
 if __name__ == '__main__':
-    # 调试代码：实例化 FrameCapture 并显示画面
+    # 调试代码：实例化 VisionDriver 并显示画面
     # 默认使用配置中的参数，如果没有配置则手动指定
     try:
         from configs.config import cfg
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         t_width = 480//2
         t_height = 270//2
 
-    capture = FrameCapture(
+    capture = VisionDriver(
         camera_index=camera_idx,
         camera_width=c_width,
         camera_height=c_height,
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         while True:
             if capture.latest_frame is not None:
                 # 显示采集到的画面
-                cv2.imshow('FrameCapture Debug', capture.latest_frame)
+                cv2.imshow('VisionDriver Debug', capture.latest_frame)
             
             # 等待 1ms 检查按键，按 'q' 键退出
             if cv2.waitKey(1) & 0xFF == ord('q'):

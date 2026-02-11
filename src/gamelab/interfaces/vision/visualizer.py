@@ -7,7 +7,7 @@ import src.gamelab.interfaces.window_utils as window_utils
 class InputVisRunner:
     """职责：以固定帧率循环显示输入序列帧，便于观察状态堆叠。
     
-    属于 capture 接口的调试辅助工具。
+    属于 vision 接口的调试辅助工具。
     """
 
     def __init__(self, fps):

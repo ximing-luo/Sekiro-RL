@@ -93,7 +93,7 @@ class ManagerBasedEnv:
         
         # 调试可视化 (可选)
         if scene_cfg.debug_vis_fps > 0:
-            from src.gamelab.interfaces.capture.visualizer import InputVisRunner
+            from src.gamelab.interfaces.vision.visualizer import InputVisRunner
             self._input_vis_runner = InputVisRunner(scene_cfg.debug_vis_fps)
             self._input_vis_runner.start()
 
