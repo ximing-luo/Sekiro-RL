@@ -14,7 +14,7 @@ TELEMETRY_KEYS = [
 def memory_metrics(env, **kwargs):
     """从内存读取的基础数值指标。对标 Isaac Lab 的 Telemetry Injection。"""
     # 追求强契约：直接从环境绑定的资产获取数据，消除字典查找
-    data = env.scene.player.data
+    data = env.scene.sekiro.data
     
     # 返回归一化后的指标张量 [num_envs, 10]
     # 拼接顺序：HP, HP_Max, Posture, Posture_Max, Boss_HP, Boss_HP_Max, Boss_Posture, Boss_Posture_Max, Player_Deaths, Enemy_Deaths
@@ -27,8 +27,8 @@ def memory_metrics(env, **kwargs):
         data.enemy.hp_max,
         data.enemy.posture,
         data.enemy.posture_max,
-        data.stats.player_deaths.float(),
-        data.stats.enemy_deaths.float()
+        data.status.player_deaths.float(),
+        data.status.enemy_deaths.float()
     ], dim=-1)
     
     return metrics

@@ -18,7 +18,7 @@ class ObservationTerm(ManagerTermBase):
         raise NotImplementedError
 
     @abstractmethod
-    def __call__(self) -> torch.Tensor:
+    def __call__(self, env_ids: Sequence[int] | None = None) -> torch.Tensor:
         """获取观测值。"""
         raise NotImplementedError
 
@@ -43,9 +43,11 @@ class StandardObservationTerm(ObservationTerm):
             dtype=self.cfg.dtype
         )
 
-    def __call__(self) -> torch.Tensor:
+    def __call__(self, env_ids: Sequence[int] | None = None) -> torch.Tensor:
         # 直接调用函数，假定返回符合契约的 Tensor
-        val = self.cfg.func(env=self._env, **self.cfg.params)
+        # 注意：观测项通常一次性计算所有环境，然后由 Manager 处理 view
+        if env_ids is None: env_ids = range(self._env.num_envs)
+        val = self.cfg.func(env=self._env, cfg=self.cfg)
         
         # 应用缩放（只有在需要时才应用）
         if self.cfg.scale != 1.0:

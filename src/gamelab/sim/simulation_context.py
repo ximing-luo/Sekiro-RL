@@ -70,8 +70,8 @@ class SimulationContext:
         print(f"[INFO] 正在设置仿真环境: {self.cfg.window_title}...")
         
         # 1. 窗口定位
-        window_utils.move_window(self.cfg.window_title, self.cfg.window_pos, True)
-        window_utils.activate_window_by_title(self.cfg.window_title)
+        window_utils.move_window(self.cfg.window_title, self.cfg.window_pos)
+        window_utils.activate_window(self.cfg.window_title)
         
         # 2. 启动传感器
         for name, sensor in self.sensors.items():
@@ -112,6 +112,7 @@ class SimulationContext:
 
         # 检查手动暂停
         self._stasis()
+        window_utils.activate_window(self.cfg.window_title)
 
         # 更新时间戳（即使是实时游戏，我们也维持一个逻辑时钟）
         self._sim_time += self.cfg.dt

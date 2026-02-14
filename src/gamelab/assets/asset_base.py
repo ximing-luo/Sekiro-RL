@@ -61,3 +61,25 @@ class AssetBase(ABC):
             env_ids: 环境 ID 序列。如果为 None，则重置所有环境。
         """
         pass
+
+    def __getitem__(self, env_id: int) -> Any:
+        """获取指定环境的资产数据。（如 asset[env_id]）
+        
+        Args:
+            env_id: 环境 ID。
+        
+        Returns:
+            资产数据。
+        """
+        return self.data[env_id]
+
+    def __getattr__(self, name: str) -> Any:
+        """获取资产数据的属性。(如 asset.player)
+        
+        Args:
+            name: 属性名。
+        
+        Returns:
+            属性值。
+        """
+        return getattr(self.data, name)

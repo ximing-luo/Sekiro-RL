@@ -33,7 +33,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
         capture_fps=config.cfg.scene.capture_fps,
         debug_vis_fps=config.cfg.ui.debug_vis_fps,
         assets={
-            "player": SekiroAssetCfg()
+            "sekiro": SekiroAssetCfg()
         }
     ))
     
@@ -41,11 +41,15 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     observations: dict = field(default_factory=lambda: {
         "policy": ObservationTermCfg(
             func=sekiro_mdp.observations.image_frame,
+            low=0,
+            high=255,
             shape=(3, config.cfg.scene.img_height, config.cfg.scene.img_width),
             dtype=np.uint8
         ),
         "telemetry": ObservationTermCfg(
             func=sekiro_mdp.observations.memory_metrics,
+            low=0,
+            high=np.inf,
             shape=(10,),
             dtype=np.int16
         ),
@@ -61,23 +65,24 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
 
     # 3.5 事件项配置 (Event Terms)
     events: dict = field(default_factory=lambda: {
-        "sekiro_events": sekiro_mdp.events.sekiro_events_cfg(sekiro_mdp.events.SEKIRO_EVENT_CONFIGS)
+        "player_deaths": EventTermCfg(func=sekiro_mdp.events.player_death_event),
+        "enemy_deaths": EventTermCfg(func=sekiro_mdp.events.enemy_death_event),
+        "player_hp_decreased": EventTermCfg(func=sekiro_mdp.events.player_hp_decreased_event),
+        "enemy_hp_decreased": EventTermCfg(func=sekiro_mdp.events.enemy_hp_decreased_event),
+        "player_posture_changed": EventTermCfg(func=sekiro_mdp.events.player_posture_changed_event),
+        "enemy_posture_changed": EventTermCfg(func=sekiro_mdp.events.enemy_posture_changed_event),
     })
     
     # 4. 奖励项配置 (Reward Terms)
     # 遵循 Isaac Lab 风格：直接使用 MDP 层提供的配置工厂，实现解耦且简洁
     rewards: dict = field(default_factory=lambda: {
-        "player_death": sekiro_mdp.rewards.event_reward_cfg(event_id=0, reward=-10.0, weight=1.0),
-        "boss_death": sekiro_mdp.rewards.event_reward_cfg(event_id=1, reward=10.0, weight=1.0),
-        "player_health": sekiro_mdp.rewards.delta_reward_cfg(key='player_hp', scale=0.01, weight=0.2),
-        "boss_health": sekiro_mdp.rewards.delta_reward_cfg(key='enemy_hp', scale=-0.01, weight=0.5),
-        "player_stamina": sekiro_mdp.rewards.delta_reward_cfg(key='player_posture', scale=-0.01, weight=0.2),
-        "boss_stamina": sekiro_mdp.rewards.delta_reward_cfg(key='enemy_posture', scale=0.01, weight=0.5),
-        "survival": RewardTermCfg(
-            class_type=sekiro_mdp.rewards.SekiroSurvivalRewardTerm,
-            weight=1.0, 
-            params={"move_cost": -0.05, "skill_cost": -0.02}
-        ),
+        "player_death": RewardTermCfg(func=sekiro_mdp.rewards.player_death_reward,weight=1.0),
+        "boss_death": RewardTermCfg(func=sekiro_mdp.rewards.boss_death_reward,weight=1.0),
+        "player_health": RewardTermCfg(func=sekiro_mdp.rewards.player_health_reward,weight=0.2),
+        "boss_health": RewardTermCfg(func=sekiro_mdp.rewards.boss_health_reward,weight=0.5),
+        "player_posture": RewardTermCfg(func=sekiro_mdp.rewards.player_posture_reward,weight=0.2),
+        "boss_posture": RewardTermCfg(func=sekiro_mdp.rewards.boss_posture_reward,weight=0.5),
+        "survival": RewardTermCfg(func=sekiro_mdp.rewards.survival_reward,weight=1.0)
     })
     
     # 5. 终止项配置 (Termination Terms)

@@ -21,7 +21,8 @@ class StandardCurriculumTerm(CurriculumTerm):
         pass
 
     def __call__(self, env_ids: Sequence[int] | None = None) -> None:
-        self.cfg.func(env=self._env, env_ids=env_ids, **self.cfg.params)
+        if env_ids is None: env_ids = range(self._env.num_envs)
+        self.cfg.func(env=self._env, env_ids=env_ids, cfg=self.cfg)
 
 class CurriculumManager(ManagerBase):
     """课程管理器：实现动态任务难度调整。

@@ -18,7 +18,7 @@ class ActionTerm(ManagerTermBase):
         raise NotImplementedError
 
     @abstractmethod
-    def __call__(self, action: torch.Tensor) -> None:
+    def __call__(self, env_ids: Sequence[int] | None = None, action: torch.Tensor = None) -> None:
         """应用动作。"""
         raise NotImplementedError
 
@@ -37,18 +37,22 @@ class MultiDiscreteActionTerm(ActionTerm):
     def action_dim(self) -> List[int]:
         return self._dims
 
-    def __call__(self, action: torch.Tensor):
-        """分发动作。
-        
-        基于“逻辑-效能同构”原则：动作函数本身已是非阻塞的（通过 GhostScheduler），
-        因此直接在主线程调用即可，消除线程切换和队列开销。
-        """
+    def __call__(self, env_ids: Sequence[int] | None = None, action: torch.Tensor = None):
+        """分发动作。实现执行必然性，减少运行时分支开销。"""
+        if action is None: return
+            
+        # 1. 转换为 CPU NumPy 以便快速索引
         actions_np = action.detach().cpu().numpy().astype(int)
         
-        for env_id in range(self.num_envs):
-            env_action = actions_np[env_id]
-            for i, idx in enumerate(env_action):
-                fn = self.action_maps[i].get(idx)
+        # 确定需要执行动作的环境
+        if env_ids is None: env_ids = range(self.num_envs)
+        
+        # 2. 物理化分发：外层循环维度，内层循环环境，符合 CPU 缓存友好性
+        for dim_idx, mapping in enumerate(self.action_maps):
+            dim_actions = actions_np[:, dim_idx]
+            for env_id in env_ids:
+                # 利用 dict.get 消除显式的 if idx in mapping 判定
+                fn = mapping.get(dim_actions[env_id])
                 if fn: fn()
 
 class ActionManager(ManagerBase):
@@ -79,7 +83,8 @@ class ActionManager(ManagerBase):
             
             # 预绑定分发闭包，消除 step 中的运行时计算
             def dispatch_fn(action, s=start_idx, e=end_idx, t=term):
-                return t(action[:, s:e])
+                # 默认作用于所有环境
+                return t(env_ids=None, action=action[:, s:e])
             
             self._term_dispatch_list.append(dispatch_fn)
             start_idx = end_idx

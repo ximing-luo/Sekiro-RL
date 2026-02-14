@@ -30,8 +30,12 @@ class ManagerTermBase(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, *args, **kwargs) -> Any:
-        """执行术语逻辑。"""
+    def __call__(self, env_ids: Sequence[int] | None = None, *args, **kwargs) -> Any:
+        """执行术语逻辑。
+        
+        Args:
+            env_ids: 需要处理的环境索引。如果为 None，则处理所有环境。
+        """
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -92,8 +96,7 @@ class ManagerBase(ABC):
 
     def reset(self, env_ids: Sequence[int] | None = None) -> Dict[str, Any]:
         """重置管理器及其所有术语。"""
-        # 展平逻辑，消除递归熵增。子类如 ObservationManager 应自行管理嵌套术语的重置。
+        # 展平逻辑，消除递归熵增。直接调用术语重置，不进行运行时探测。
         for term in self._terms.values():
-            if isinstance(term, ManagerTermBase):
-                term.reset(env_ids)
+            term.reset(env_ids)
         return {}

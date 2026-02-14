@@ -145,7 +145,7 @@ class ManagerBasedEnv:
         return obs, reward, done, time_out, info
 
     def activate_window(self):
-        window_utils.activate_window_by_title(self.sim.cfg.window_title)
+        window_utils.activate_window(self.sim.cfg.window_title)
 
     def close(self):
         """清理资源。"""

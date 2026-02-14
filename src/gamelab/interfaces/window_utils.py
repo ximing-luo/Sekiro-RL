@@ -7,7 +7,7 @@ def find_window_by_title(title: str):
     hwnd = win32gui.FindWindow(None, title)
     return hwnd if win32gui.GetWindowText(hwnd) == title else None
 
-def activate_window_by_title(title: str):
+def activate_window(title: str):
     """激活指定标题的窗口。"""
     hwnd = find_window_by_title(title)
     if not hwnd: return False
@@ -37,7 +37,7 @@ def remove_window_topmost(title: str):
     win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
     return True
 
-def move_window(title: str, x, y=None, width=None, height=None):
+def move_window(title: str, x: str | int="top_left", y=None, width=None, height=None):
     """移动并调整窗口大小。"""
     hwnd = find_window_by_title(title)
     if not hwnd: return False
@@ -69,3 +69,11 @@ def move_window(title: str, x, y=None, width=None, height=None):
     except Exception as e:
         print(f"[WindowUtils] 移动窗口失败: {e}")
         return False
+
+if __name__ == "__main__":
+    # 测试代码
+    title = "Sekiro"
+    move_window(title, "top_right")
+    activate_window(title)
+    set_window_topmost(title)
+    remove_window_topmost(title)

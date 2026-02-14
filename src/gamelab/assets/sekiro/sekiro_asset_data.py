@@ -40,17 +40,17 @@ class SekiroAssetData:
         # 1. 定义状态组：配置即逻辑
         self.player = StateBuffer(num_envs, device, ["hp", "hp_max", "posture", "posture_max"])
         self.enemy = StateBuffer(num_envs, device, ["hp", "hp_max", "posture", "posture_max"])
-        self.stats = StateBuffer(num_envs, device, ["player_deaths", "enemy_deaths"])
+        self.status = StateBuffer(num_envs, device, ["player_deaths", "enemy_deaths"])
 
     def backup(self):
         """同步备份所有状态组。"""
         self.player.backup()
         self.enemy.backup()
-        self.stats.backup()
+        self.status.backup()
 
     def update_from_raw(self, raw_data: tuple, env_id: int = 0):
         """将 TelemetryDriver 读出的原始元组分发给各个状态组。"""
         # 依据内存布局顺序切片分发
         self.player.update(raw_data[0:4], env_id)
         self.enemy.update(raw_data[4:8], env_id)
-        self.stats.update(raw_data[8:10], env_id)
+        self.status.update(raw_data[8:10], env_id)

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class TerminationTerm(ManagerTermBase):
     """终止术语基类。"""
     @abstractmethod
-    def __call__(self) -> torch.Tensor:
+    def __call__(self, env_ids: Sequence[int] | None = None) -> torch.Tensor:
         """判定是否终止。"""
         raise NotImplementedError
 
@@ -21,12 +21,10 @@ class StandardTerminationTerm(TerminationTerm):
         super().__init__(cfg, env)
         self._device_obj = torch.device(self.device)
 
-    def __call__(self) -> torch.Tensor:
+    def __call__(self, env_ids: Sequence[int] | None = None) -> torch.Tensor:
         # 直接调用函数，通过 env 引用自行获取所需数据
-        return self.cfg.func(
-            env=self._env, 
-            **self.cfg.params
-        )
+        # 底层函数需返回 [num_envs] 的布尔张量
+        return self.cfg.func(env=self._env, env_ids=env_ids, cfg=self.cfg)
 
 class TerminationManager(ManagerBase):
     """终止管理器：实现基于术语的终止判定。
@@ -47,8 +45,8 @@ class TerminationManager(ManagerBase):
             term: TerminationTerm = self._terms[name]
             term_cfg = self.cfg[name]
             
-            # 调用判定对象 (不再传递参数)
-            res = term()
+            # 调用判定对象，获取所有环境的终止状态
+            res = term(env_ids=None)
             
             # 更新缓存
             self._done_buf |= res
