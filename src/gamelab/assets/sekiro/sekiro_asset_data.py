@@ -1,54 +1,56 @@
 import torch
 from dataclasses import dataclass
+from typing import List
+
+class StateBuffer:
+    """双缓冲状态容器：自动化管理当前值与上一帧值。"""
+    def __init__(self, num_envs: int, device: str, fields: List[str]):
+        self.fields = fields
+        dtype = torch.int32
+        
+        # 存储张量字典，便于循环操作
+        self.storage = {f: torch.zeros(num_envs, dtype=dtype, device=device) for f in fields}
+        self.prev_storage = {f: torch.zeros(num_envs, dtype=dtype, device=device) for f in fields}
+        
+        # 动态绑定属性，支持 .hp 这种直接访问方式
+        for field in fields:
+            setattr(self, field, self.storage[field])
+            setattr(self, f"prev_{field}", self.prev_storage[field])
+
+    def backup(self):
+        """一键备份当前状态到 prev_ 缓冲区。"""
+        for f in self.fields:
+            self.prev_storage[f].copy_(self.storage[f])
+
+    def update(self, values: tuple, env_id: int = 0):
+        """按顺序将原始数值填充到张量缓冲区。"""
+        for i, f in enumerate(self.fields):
+            self.storage[f][env_id] = values[i]
 
 @dataclass
 class SekiroAssetData:
     """Sekiro 资产的数据容器。
     
-    存储玩家和敌人的实时状态（HP, Posture 等），全部采用 Tensor 格式。
-    支持记录上一帧状态，以便计算奖励和检测事件。
+    采用“状态组”结构，实现自动化双缓冲管理。
     """
-    
     def __init__(self, num_envs: int, device: str):
-        self.device = device
         self.num_envs = num_envs
+        self.device = device
         
-        # 当前状态
-        self.player_hp = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.player_hp_max = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.player_posture = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.player_posture_max = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.enemy_hp = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.enemy_hp_max = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.enemy_posture = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.enemy_posture_max = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.player_deaths = torch.zeros(num_envs, dtype=torch.int32, device=device)
-        self.enemy_deaths = torch.zeros(num_envs, dtype=torch.int32, device=device)
-        
-        # 上一帧状态 (用于计算 Delta)
-        self.prev_player_hp = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.prev_player_posture = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.prev_enemy_hp = torch.zeros(num_envs, dtype=torch.float32, device=device)
-        self.prev_enemy_posture = torch.zeros(num_envs, dtype=torch.float32, device=device)
+        # 1. 定义状态组：配置即逻辑
+        self.player = StateBuffer(num_envs, device, ["hp", "hp_max", "posture", "posture_max"])
+        self.enemy = StateBuffer(num_envs, device, ["hp", "hp_max", "posture", "posture_max"])
+        self.stats = StateBuffer(num_envs, device, ["player_deaths", "enemy_deaths"])
 
-    def update_prev(self):
-        """将当前状态备份到上一帧。"""
-        self.prev_player_hp.copy_(self.player_hp)
-        self.prev_player_posture.copy_(self.player_posture)
-        self.prev_enemy_hp.copy_(self.enemy_hp)
-        self.prev_enemy_posture.copy_(self.enemy_posture)
+    def backup(self):
+        """同步备份所有状态组。"""
+        self.player.backup()
+        self.enemy.backup()
+        self.stats.backup()
 
-    def update_from_dict(self, data_dict: dict, env_id: int = 0):
-        """将从内存读取的字典数据同步到 Tensor 缓冲区。"""
-        self.player_hp[env_id] = float(data_dict.get("player_hp", 0))
-        self.player_hp_max[env_id] = float(data_dict.get("player_hp_max", 1))
-        self.player_posture[env_id] = float(data_dict.get("player_posture", 0))
-        self.player_posture_max[env_id] = float(data_dict.get("player_posture_max", 1))
-        
-        self.enemy_hp[env_id] = float(data_dict.get("enemy_hp", 0))
-        self.enemy_hp_max[env_id] = float(data_dict.get("enemy_hp_max", 1))
-        self.enemy_posture[env_id] = float(data_dict.get("enemy_posture", 0))
-        self.enemy_posture_max[env_id] = float(data_dict.get("enemy_posture_max", 1))
-        
-        self.player_deaths[env_id] = int(data_dict.get("player_deaths", 0))
-        self.enemy_deaths[env_id] = int(data_dict.get("enemy_deaths", 0))
+    def update_from_raw(self, raw_data: tuple, env_id: int = 0):
+        """将 TelemetryDriver 读出的原始元组分发给各个状态组。"""
+        # 依据内存布局顺序切片分发
+        self.player.update(raw_data[0:4], env_id)
+        self.enemy.update(raw_data[4:8], env_id)
+        self.stats.update(raw_data[8:10], env_id)

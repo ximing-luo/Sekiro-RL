@@ -4,7 +4,15 @@
 """
 
 from src.gamelab.assets.sekiro import ops as _actions
-from src.gamelab.envs.mdp.actions import multi_discrete_action_provider
+from src.gamelab.managers.action_manager import MultiDiscreteActionTerm
+from src.gamelab.managers.manager_term_cfg import ActionTermCfg, MultiDiscreteActionTermCfg
+
+def body_action_cfg(action_maps: list) -> MultiDiscreteActionTermCfg:
+    """提供只狼身体动作的简洁配置。"""
+    return MultiDiscreteActionTermCfg(
+        class_type=MultiDiscreteActionTerm,
+        action_maps=action_maps
+    )
 
 # 动作映射定义 (纯数据)
 MOVE_MAP = {
@@ -23,16 +31,6 @@ SKILL_MAP = {
 
 # 维度信息供配置类使用
 MULTI_DISCRETE_DIMS = [len(MOVE_MAP), len(SKILL_MAP)]
-
-def sekiro_multi_discrete_action(action_indices: list, **kwargs):
-    """
-    只狼多维动作：直接调用通用映射器。
-    """
-    return multi_discrete_action_provider(
-        action_indices=action_indices,
-        action_maps=[MOVE_MAP, SKILL_MAP],
-        **kwargs
-    )
 
 # 标签定义 (UI/可视化用)
 MULTI_DISCRETE_LABELS = [

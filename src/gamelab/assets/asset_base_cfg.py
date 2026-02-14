@@ -1,8 +1,7 @@
-from dataclasses import MISSING
+from dataclasses import dataclass, MISSING
 from typing import Type, Any
-from src.gamelab.utils.configclass import configclass
 
-@configclass
+@dataclass
 class AssetBaseCfg:
     """游戏资产的基础配置类。
     

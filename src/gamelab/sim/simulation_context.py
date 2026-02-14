@@ -6,6 +6,7 @@ from typing import Dict, Optional, Any
 from .simulation_cfg import SimulationCfg
 from src.gamelab.sim.sensors.base_sensor import BaseSensor
 import src.gamelab.interfaces.window_utils as window_utils
+from src.gamelab.interfaces.input.monitor import key_check
 
 class SimulationContext:
     """仿真上下文管理器：负责游戏环境的生命周期、窗口同步与传感器调度。
@@ -39,7 +40,7 @@ class SimulationContext:
             
         if cfg is None:
             cfg = SimulationCfg()
-        cfg.validate()
+        cfg.validate() # 校验配置合法性
         self.cfg = cfg
         
         self.device = torch.device(self.cfg.device)
@@ -51,6 +52,7 @@ class SimulationContext:
         self._step_count = 0
         
         self._initialized = True
+        self._debug_vis_runner = None
         print(f"[INFO] SimulationContext 已初始化 (device={self.device}, dt={self.cfg.dt})")
 
     def add_sensor(self, name: str, sensor: BaseSensor):
@@ -69,17 +71,36 @@ class SimulationContext:
         
         # 1. 窗口定位
         window_utils.move_window(self.cfg.window_title, self.cfg.window_pos, True)
-        window_utils.activate_window_by_title_contains(self.cfg.window_title, True)
+        window_utils.activate_window_by_title(self.cfg.window_title)
         
         # 2. 启动传感器
         for name, sensor in self.sensors.items():
             print(f"[INFO] 启动传感器: {name}")
             sensor.start()
             
-        # 3. 预热
+        # 3. 启动调试可视化 (如果启用)
+        if self.cfg.debug_vis_fps > 0:
+            from src.gamelab.interfaces.vision.visualizer import InputVisRunner
+            self._debug_vis_runner = InputVisRunner(self.cfg.debug_vis_fps)
+            self._debug_vis_runner.start()
+            print(f"[INFO] 调试可视化已启动 (FPS={self.cfg.debug_vis_fps})")
+            
+        # 4. 预热
         time.sleep(1.0)
         self.is_running = True
         print("[INFO] 仿真环境已就绪。")
+
+    def _stasis(self):
+        """手动暂停逻辑：T 暂停，Alt+T 继续。"""
+        keys = key_check()
+        if 'T' in keys and 'ALT' not in keys:
+            print("[SimulationContext] 检测到手动暂停指令 (T)。按 Alt+T 继续...")
+            while True:
+                time.sleep(0.05)
+                k = key_check()
+                if 'T' in k and 'ALT' in k:
+                    print("[SimulationContext] 仿真已继续。")
+                    break
 
     def step(self, render: bool = True):
         """执行一个仿真步。
@@ -89,16 +110,24 @@ class SimulationContext:
         if not self.is_running:
             return
 
+        # 检查手动暂停
+        self._stasis()
+
         # 更新时间戳（即使是实时游戏，我们也维持一个逻辑时钟）
         self._sim_time += self.cfg.dt
         self._step_count += 1
-        
-        # 这里可以加入强制同步逻辑（如果需要对齐游戏帧）
 
     def stop(self):
         """停止仿真并清理资源。"""
+        # 1. 停止传感器
         for sensor in self.sensors.values():
             sensor.stop()
+        
+        # 2. 停止可视化器
+        if self._debug_vis_runner is not None:
+            self._debug_vis_runner.stop()
+            self._debug_vis_runner = None
+            
         self.is_running = False
         print("[INFO] 仿真环境已停止。")
 

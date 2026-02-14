@@ -6,6 +6,7 @@ from .manager_based_env_cfg import ManagerBasedEnvCfg
 from src.gamelab.scene.interactive_scene import InteractiveScene
 from src.gamelab.sim import SimulationContext, SimulationCfg
 from src.gamelab.sim.sensors.vision_sensor import VisionSensor
+from src.gamelab.interfaces import window_utils
 from src.gamelab.managers import (
     ActionManager,
     ObservationManager,
@@ -25,17 +26,11 @@ class ManagerBasedEnv:
     对标 Isaac Lab 的 ManagerBasedEnv。
     """
     def __init__(self, cfg: ManagerBasedEnvCfg, render_mode: str | None = None):
+        # 1. 固化契约：仅接受已就绪的配置对象
         self.cfg = cfg
         self.render_mode = render_mode
         
-        # 基础属性 (对标 Isaac Lab)
-        self.num_envs = 1  # 目前单机单实例
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        
-        # 1. 初始化场景与资产
         self.scene: Optional[InteractiveScene] = None
-        
-        # 2. 初始化仿真桥接器 (物理底座)
         
         # 2. 初始化逻辑管理器
         self.action_manager: Optional[ActionManager] = None
@@ -50,12 +45,21 @@ class ManagerBasedEnv:
         # 记录环境步数
         self.common_step_counter = 0
 
+    @property
+    def num_envs(self) -> int:
+        """环境中的并行实例数量。"""
+        return self.cfg.scene.num_envs
+
+    @property
+    def device(self) -> str:
+        """环境运行的计算设备。"""
+        return self.cfg.device
+
     def _setup_managers(self):
         """初始化仿真器与各管理器。"""
         scene_cfg = self.cfg.scene
-        self.num_envs = scene_cfg.num_envs
         
-        # A. 创建场景
+        # A. 创建场景 (物理属性归位：从 self.device 获取)
         self.scene = InteractiveScene(scene_cfg, device=self.device)
         
         # B. 初始化仿真上下文 (对标 Isaac Lab 的 sim)
@@ -63,7 +67,9 @@ class ManagerBasedEnv:
             dt=1.0 / scene_cfg.capture_fps,
             window_title="Sekiro",
             window_pos=scene_cfg.pos,
-            headless=False # 目前强制开启 GUI 以便观测
+            device=self.device,
+            headless=self.cfg.headless,
+            debug_vis_fps=scene_cfg.debug_vis_fps
         )
         self.sim = SimulationContext(sim_cfg)
         
@@ -80,8 +86,8 @@ class ManagerBasedEnv:
         
         # D. 启动仿真
         self.sim.setup()
-        
-        # E. 实例化逻辑管理器 (传递配置和环境实例)
+          
+        # F. 实例化逻辑管理器 (传递配置和环境实例)
         self.action_manager = ActionManager(self.cfg.actions, self)
         self.observation_manager = ObservationManager(self.cfg.observations, self)
         self.reward_manager = RewardManager(self.cfg.rewards, self)
@@ -90,22 +96,12 @@ class ManagerBasedEnv:
         self.command_manager = CommandManager(self.cfg.commands, self)
         self.recorder_manager = RecorderManager(self.cfg.recorders, self)
         self.curriculum_manager = CurriculumManager(self.cfg.curriculums, self)
-        
-        # 调试可视化 (可选)
-        if scene_cfg.debug_vis_fps > 0:
-            from src.gamelab.interfaces.vision.visualizer import InputVisRunner
-            self._input_vis_runner = InputVisRunner(scene_cfg.debug_vis_fps)
-            self._input_vis_runner.start()
 
     def reset(self, env_ids: Sequence[int] | None = None) -> Dict[str, torch.Tensor]:
         """重置环境。"""
-        if env_ids is None:
-            env_ids = list(range(self.num_envs))
+        env_ids = env_ids if env_ids is not None else list(range(self.num_envs))
             
-        # 重置场景资产
         self.scene.reset(env_ids)
-            
-        # 重置各管理器
         self.action_manager.reset(env_ids)
         self.reward_manager.reset(env_ids)
         self.termination_manager.reset(env_ids)
@@ -113,90 +109,44 @@ class ManagerBasedEnv:
         self.command_manager.reset(env_ids)
         self.curriculum_manager.reset(env_ids)
         
-        # 获取初始观测
-        obs = self.observation_manager.compute_observations()
-        return obs
+        return self.observation_manager.step()
 
     def step(self, action: torch.Tensor) -> tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, Dict]:
-        """执行一个环境步。"""
-        # 0. 获取当前指标作为 prev_metrics
-        prev_metrics = self.get_metrics()
+        """执行一个环境步。
+        
+        实现执行必然性：移除试探性判断，确立线性数据流。
+        """
+        # 0. 状态采样
+        self.scene.write_data_to_sim()
 
-        # 1. 执行动作
-        self.action_manager.apply_action(action)
-        
-        # 2. 同步仿真状态
+        # 1. 物理步进
+        self.action_manager.step(action)
         self.sim.step()
-        
-        # 3. 同步游戏状态 (从内存读取资产数据)
         self.scene.update(self.sim.cfg.dt)
         
-        # 3.5 获取最新指标作为 next_metrics 并计算事件
-        next_metrics = self.get_metrics()
-        events = self.event_manager.compute_events(prev_metrics, next_metrics)
+        # 2. 逻辑采样
+        self.event_manager.step(mode="step")
 
-        # 4. 计算奖励、终止
-        reward, reward_components = self.reward_manager.compute_reward(
-            prev_metrics=prev_metrics,
-            next_metrics=next_metrics,
-            action=action,
-            events=events
-        )
-        done, time_out = self.termination_manager.compute_terminations(
-            prev_metrics=prev_metrics,
-            next_metrics=next_metrics,
-            events=events
-        )
+        # 3. 结果解算
+        reward, reward_components = self.reward_manager.step(self.sim.cfg.dt)
+        done, time_out = self.termination_manager.step()
+        obs = self.observation_manager.step()
         
-        # 5. 获取最新观测
-        obs = self.observation_manager.compute_observations()
-        
-        # 6. 更新步数计数器
         self.common_step_counter += 1
         
         # 封装 info
         info = {
             "time_out": time_out,
             "step": self.common_step_counter,
-            "events": events,
+            "events": self.event_manager.recent_events,
             "reward_components": reward_components
         }
         
         return obs, reward, done, time_out, info
 
-    def get_metrics(self) -> Dict[str, Any]:
-        """获取当前环境的指标字典，供 Reward/Event 管理器使用。"""
-        # 目前只支持 telemetry 传感器提供的指标
-        # 也可以从 scene.assets 中提取
-        metrics = {"telemetry": {}}
-        
-        # 从 SekiroAsset 中提取数据 (如果存在)
-        if "player" in self.scene.assets:
-            player = self.scene.assets["player"]
-            if hasattr(player, "data"):
-                data = player.data
-                metrics["telemetry"].update({
-                    "self_blood": data.player_hp,
-                    "self_blood_max": data.player_hp_max,
-                    "self_stamina": data.player_posture,
-                    "self_stamina_max": data.player_posture_max,
-                    "boss_blood": data.enemy_hp,
-                    "boss_blood_max": data.enemy_hp_max,
-                    "boss_stamina": data.enemy_posture,
-                    "boss_stamina_max": data.enemy_posture_max,
-                    "player_deaths": data.player_deaths,
-                    "enemy_deaths": data.enemy_deaths
-                })
-        
-        return metrics
-
     def activate_window(self):
-        if self.sim:
-            window_utils.activate_window_by_title_contains(self.sim.cfg.window_title)
+        window_utils.activate_window_by_title(self.sim.cfg.window_title)
 
     def close(self):
         """清理资源。"""
-        if self.sim:
-            self.sim.stop()
-        if hasattr(self, '_input_vis_runner') and self._input_vis_runner:
-            self._input_vis_runner.stop()
+        self.sim.stop()

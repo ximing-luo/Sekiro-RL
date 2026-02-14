@@ -1,15 +1,17 @@
 from dataclasses import dataclass, field
+
+import numpy as np
 from src.gamelab.envs.manager_based_env_cfg import (
     SceneCfg, 
     RewardTermCfg, 
-    ObservationTermCfg, 
-    ObservationGroupCfg,
+    ObservationTermCfg,
     TerminationTermCfg, 
     ActionTermCfg, 
     EventTermCfg,
     CommandTermCfg,
     RecorderTermCfg
 )
+from src.gamelab.managers.observation_manager import ObservationManager
 from src.gamelab.envs.manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
 from src.gamelab.assets.sekiro.sekiro_asset_cfg import SekiroAssetCfg
 import src.gamelab.envs.mdp as mdp
@@ -27,7 +29,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     scene: SceneCfg = field(default_factory=lambda: SceneCfg(
         observation_w=config.cfg.scene.img_width,
         observation_h=config.cfg.scene.img_height,
-        pos="top_left",
+        pos=config.cfg.scene.pos,
         capture_fps=config.cfg.scene.capture_fps,
         debug_vis_fps=config.cfg.ui.debug_vis_fps,
         assets={
@@ -37,38 +39,44 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     
     # 2. 观测项配置 (Observation Groups)
     observations: dict = field(default_factory=lambda: {
-        "policy": ObservationGroupCfg(
-            concatenate_terms=False,
-            terms={
-                "image": ObservationTermCfg(func=sekiro_mdp.observations.image_frame),
-                "telemetry": ObservationTermCfg(func=sekiro_mdp.observations.memory_metrics),
-            }
-        )
+        "policy": ObservationTermCfg(
+            func=sekiro_mdp.observations.image_frame,
+            shape=(3, config.cfg.scene.img_height, config.cfg.scene.img_width),
+            dtype=np.uint8
+        ),
+        "telemetry": ObservationTermCfg(
+            func=sekiro_mdp.observations.memory_metrics,
+            shape=(10,),
+            dtype=np.int16
+        ),
     })
     
     # 3. 动作项配置 (Action Terms)
     actions: dict = field(default_factory=lambda: {
-        "body": ActionTermCfg(func=sekiro_mdp.actions.sekiro_multi_discrete_action, params={"dims": sekiro_mdp.actions.MULTI_DISCRETE_DIMS})
+        "body": sekiro_mdp.actions.body_action_cfg([
+            sekiro_mdp.actions.MOVE_MAP, 
+            sekiro_mdp.actions.SKILL_MAP
+        ])
     })
 
     # 3.5 事件项配置 (Event Terms)
     events: dict = field(default_factory=lambda: {
-        "sekiro_events": EventTermCfg(func=sekiro_mdp.events.sekiro_events_logic)
+        "sekiro_events": sekiro_mdp.events.sekiro_events_cfg(sekiro_mdp.events.SEKIRO_EVENT_CONFIGS)
     })
     
     # 4. 奖励项配置 (Reward Terms)
-    # 遵循 Isaac Lab 风格：在这里调整权重(weight)和参数(params)，不要改 mdp 源码
+    # 遵循 Isaac Lab 风格：直接使用 MDP 层提供的配置工厂，实现解耦且简洁
     rewards: dict = field(default_factory=lambda: {
-        "player_death": RewardTermCfg(func=sekiro_mdp.rewards.player_death_reward, weight=1.0), # 原始分 -10.0 -> 最终 -10.0
-        "boss_death": RewardTermCfg(func=sekiro_mdp.rewards.boss_death_reward, weight=1.0),     # 原始分 +10.0 -> 最终 +10.0
-        "player_health": RewardTermCfg(func=sekiro_mdp.rewards.player_health_reward, weight=0.2), # 100伤害 = -1.0 * 0.2 = -0.2
-        "boss_health": RewardTermCfg(func=sekiro_mdp.rewards.boss_health_reward, weight=0.5),   # 100伤害 = +1.0 * 0.5 = +0.5
-        "player_stamina": RewardTermCfg(func=sekiro_mdp.rewards.player_stamina_reward, weight=0.2), # 100恶化 = -1.0 * 0.2 = -0.2
-        "boss_stamina": RewardTermCfg(func=sekiro_mdp.rewards.boss_stamina_reward, weight=0.5), # 100进度 = +1.0 * 0.5 = +0.5
+        "player_death": sekiro_mdp.rewards.event_reward_cfg(event_id=0, reward=-10.0, weight=1.0),
+        "boss_death": sekiro_mdp.rewards.event_reward_cfg(event_id=1, reward=10.0, weight=1.0),
+        "player_health": sekiro_mdp.rewards.delta_reward_cfg(key='player_hp', scale=0.01, weight=0.2),
+        "boss_health": sekiro_mdp.rewards.delta_reward_cfg(key='enemy_hp', scale=-0.01, weight=0.5),
+        "player_stamina": sekiro_mdp.rewards.delta_reward_cfg(key='player_posture', scale=-0.01, weight=0.2),
+        "boss_stamina": sekiro_mdp.rewards.delta_reward_cfg(key='enemy_posture', scale=0.01, weight=0.5),
         "survival": RewardTermCfg(
-            func=sekiro_mdp.rewards.survival_reward, 
+            class_type=sekiro_mdp.rewards.SekiroSurvivalRewardTerm,
             weight=1.0, 
-            params={"move_cost": -0.05, "skill_cost": -0.02} # 在这里调动作成本
+            params={"move_cost": -0.05, "skill_cost": -0.02}
         ),
     })
     

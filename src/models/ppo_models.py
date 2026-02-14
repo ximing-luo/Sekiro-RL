@@ -145,7 +145,7 @@ class SekiroMultiInputExtractor(BaseFeaturesExtractor):
         super().__init__(observation_space, features_dim)
         
         # A. 视觉分支 (使用原有的稳定提取器)
-        self.image_extractor = SekiroStableExtractor(observation_space["image"], features_dim=features_dim)
+        self.image_extractor = SekiroStableExtractor(observation_space["policy"], features_dim=features_dim)
         
         # B. 遥测分支
         telemetry_dim = observation_space["telemetry"].shape[0]
@@ -160,7 +160,7 @@ class SekiroMultiInputExtractor(BaseFeaturesExtractor):
 
     def forward(self, observations: Dict[str, torch.Tensor]) -> torch.Tensor:
         # 1. 提取视觉特征
-        img_feats = self.image_extractor(observations["image"])
+        img_feats = self.image_extractor(observations["policy"])
         
         # 2. 获取遥测特征
         tele_feats = observations["telemetry"]

@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable
 from src.gamelab.managers.manager_term_cfg import (
-    ObservationGroupCfg,
     ObservationTermCfg,
     ActionTermCfg,
     EventTermCfg,
@@ -30,7 +29,7 @@ class ManagerBasedEnvCfg:
     """基础管理器驱动环境配置。"""
     scene: SceneCfg = field(default_factory=SceneCfg)
     # 管理器配置项（默认为空，由子类或任务配置填充）
-    observations: Dict[str, ObservationGroupCfg] = field(default_factory=dict)
+    observations: Dict[str, ObservationTermCfg] = field(default_factory=dict)
     actions: Dict[str, ActionTermCfg] = field(default_factory=dict)
     events: Dict[str, EventTermCfg] = field(default_factory=dict)
     rewards: Dict[str, RewardTermCfg] = field(default_factory=dict)

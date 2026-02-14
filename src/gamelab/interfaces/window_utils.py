@@ -2,156 +2,70 @@ import win32gui
 import win32con
 import win32api
 
-def find_window_by_title_contains(title_part, strict=False):
-    title_q = (str(title_part) if title_part is not None else "").strip()
-    if title_q == "":
-        return None
+def find_window_by_title(title: str):
+    """精准查找窗口。基于强硬契约：错一个字符都找不到。"""
+    hwnd = win32gui.FindWindow(None, title)
+    return hwnd if win32gui.GetWindowText(hwnd) == title else None
 
-    exact_hwnd = None
-    fallback_hwnd = None
-    fallback_title_len = None
-
-    def callback(hw, extra):
-        nonlocal exact_hwnd, fallback_hwnd, fallback_title_len
-        if not win32gui.IsWindowVisible(hw):
-            return True
-        t = win32gui.GetWindowText(hw)
-        tl = t.strip().lower()
-        ql = title_q.lower()
-        if tl == ql:
-            exact_hwnd = hw
-            return False
-        
-        if not strict:
-            if ql in tl:
-                if fallback_hwnd is None:
-                    fallback_hwnd = hw
-                    fallback_title_len = len(tl)
-                else:
-                    if len(tl) < (fallback_title_len or 0):
-                        fallback_hwnd = hw
-                        fallback_title_len = len(tl)
-        return True
-
-    try:
-        win32gui.EnumWindows(callback, None)
-    except Exception as e:
-        if "拒绝访问" in str(e) or "Access is denied" in str(e):
-            print("\n" + "!"*60)
-            print("错误：枚举窗口被拒绝访问。")
-            print("请尝试以【管理员身份】运行 IDE 或终端。")
-            print("!"*60 + "\n")
-        raise e
-
-    if exact_hwnd:
-        return exact_hwnd
+def activate_window_by_title(title: str):
+    """激活指定标题的窗口。"""
+    hwnd = find_window_by_title(title)
+    if not hwnd: return False
     
-    if strict:
-        return None
-        
-    return fallback_hwnd
-
-def activate_window_by_title_contains(window_title_part, strict=False):
-    hwnd = find_window_by_title_contains(window_title_part, strict=strict)
-    if not hwnd:
-        return False
+    if win32gui.GetForegroundWindow() == hwnd: return True
 
     try:
-        if win32gui.GetForegroundWindow() != hwnd:
-            win32gui.SetForegroundWindow(hwnd)
-            if win32gui.IsIconic(hwnd):
-                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            print(f"Window '{window_title_part}' activated.")
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        win32gui.SetForegroundWindow(hwnd)
         return True
     except Exception as e:
-        print(f"Error activating window: {e}")
+        print(f"[WindowUtils] 激活窗口失败: {e}")
         return False
 
-def set_window_topmost(window_title_part):
-    try:
-        hwnd = find_window_by_title_contains(window_title_part)
-        if hwnd:
-            win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            print(f"Window with title containing '{window_title_part}' set to TOPMOST.")
-            return True
-        else:
-            print(f"Window with title containing '{window_title_part}' not found.")
-            return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
+def set_window_topmost(title: str):
+    """设置窗口置顶。"""
+    hwnd = find_window_by_title(title)
+    if not hwnd: return False
+    win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    return True
 
-def remove_window_topmost(window_title_part):
-    try:
-        hwnd = find_window_by_title_contains(window_title_part)
-        if hwnd:
-            win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            print(f"Window with title containing '{window_title_part}' returned to NORMAL.")
-            return True
-        else:
-            print(f"Window with title containing '{window_title_part}' not found.")
-            return False
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return False
+def remove_window_topmost(title: str):
+    """取消窗口置顶。"""
+    hwnd = find_window_by_title(title)
+    if not hwnd: return False
+    win32gui.SetWindowPos(hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+    return True
 
-def move_window(window_title_part, x, y=None, width=None, height=None):
-    """移动并调整窗口大小。
+def move_window(title: str, x, y=None, width=None, height=None):
+    """移动并调整窗口大小。"""
+    hwnd = find_window_by_title(title)
+    if not hwnd: return False
     
-    支持两种调用方式：
-    1. move_window(title, x, y, width, height) - 经典 win32 风格
-    2. move_window(title, pos_str, repaint=True) - 预设位置风格 (top_left, center 等)
-    """
     try:
-        hwnd = find_window_by_title_contains(window_title_part)
-        if not hwnd:
-            print(f"Window with title containing '{window_title_part}' not found.")
-            return False
+        # 1. 物理采样：获取本体维度与屏幕边界
+        rect = win32gui.GetWindowRect(hwnd)
+        sw, sh = win32api.GetSystemMetrics(win32con.SM_CXSCREEN), win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
+        
+        # 必然性赋值：固化宽度与高度
+        w, h = width or (rect[2] - rect[0]), height or (rect[3] - rect[1])
 
-        # 处理预设位置字符串 (如 "top_left")
+        # 2. 坐标决策：映射逻辑意图
         if isinstance(x, str):
-            pos_str = x
-            repaint = y if y is not None else True
-            
-            # 获取窗口当前大小
-            rect = win32gui.GetWindowRect(hwnd)
-            w = width if width is not None else (rect[2] - rect[0])
-            h = height if height is not None else (rect[3] - rect[1])
-            
-            # 获取屏幕大小
-            sw = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
-            sh = win32api.GetSystemMetrics(win32con.SM_CYSCREEN)
-            
-            # 计算坐标
-            nx, ny = 0, 0
-            if pos_str == "top_left":
-                nx, ny = 0, 0
-            elif pos_str == "top_right":
-                nx, ny = sw - w, 0
-            elif pos_str == "bottom_left":
-                nx, ny = 0, sh - h
-            elif pos_str == "bottom_right":
-                nx, ny = sw - w, sh - h
-            elif pos_str == "center":
-                nx, ny = (sw - w) // 2, (sh - h) // 2
-            elif pos_str == "offscreen":
-                nx, ny = -w - 100, -h - 100
-            else:
-                print(f"Unknown position string: {pos_str}")
-                return False
-                
-            win32gui.MoveWindow(hwnd, nx, ny, w, h, repaint)
-            print(f"Window '{window_title_part}' moved to {pos_str} ({nx}, {ny}) with size {w}x{h}.")
-            return True
+            nx, ny = {
+                "top_left":     (0, 0),
+                "top_right":    (sw - w, 0),
+                "bottom_left":  (0, sh - h),
+                "bottom_right": (sw - w, sh - h),
+                "center":       ((sw - w) // 2, (sh - h) // 2),
+                "offscreen":    (-w - 100, -h - 100)
+            }[x]
         else:
-            # 经典 5 参数调用
-            if y is None or width is None or height is None:
-                print("Error: move_window requires (x, y, width, height) when x is not a string.")
-                return False
-            win32gui.MoveWindow(hwnd, x, y, width, height, True)
-            print(f"Window '{window_title_part}' moved to ({x}, {y}) with size {width}x{height}.")
-            return True
-            
+            nx, ny = x, y
+
+        # 3. 物理执行：触及底层接口 (bRepaint 始终为 True)
+        win32gui.MoveWindow(hwnd, nx, ny, w, h, True)
+        return True
     except Exception as e:
-        print(f"An error occurred in move_window: {e}")
+        print(f"[WindowUtils] 移动窗口失败: {e}")
         return False

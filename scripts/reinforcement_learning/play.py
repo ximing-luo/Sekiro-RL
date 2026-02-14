@@ -9,6 +9,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from src.tasks.registration import task_registry
 from src.gamelab.app.app_launcher import AppLauncher
 from src.gamelab.app.runners import SekiroRunner
 from src.framework.sb3.ppo_aux import AuxPPO
@@ -28,10 +29,16 @@ def main():
     args, _ = parser.parse_known_args(namespace=launcher.args)
     args = cli_args.update_sb3_cfg(args)
 
-    # 3. 创建环境
-    env, env_cfg = launcher.create_env()
+    # 3. 配置组装 (对齐 IsaacLab：显式覆盖配置属性)
+    env_cfg = task_registry.get_task_cfg(launcher.task_name)
+    env_cfg.scene.num_envs = launcher.num_envs
+    env_cfg.device = launcher.device
+    env_cfg.headless = launcher.headless
     
-    # 4. 加载 Agent (SB3 模型)
+    # 4. 创建环境 (传递已就绪的配置)
+    env = task_registry.make(launcher.task_name, cfg=env_cfg)
+    
+    # 5. 加载 Agent (SB3 模型)
     model_path = args.checkpoint if args.checkpoint else config.cfg.path.model_path
     print(f"[INFO] 正在加载模型: {model_path}")
     if not model_path or not os.path.exists(model_path):

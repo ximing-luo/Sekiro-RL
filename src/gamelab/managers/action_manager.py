@@ -1,76 +1,112 @@
 from __future__ import annotations
 import torch
-import threading
+from gymnasium import spaces
+from abc import abstractmethod
 from typing import TYPE_CHECKING, Dict, List, Any, Sequence
-from .manager_base import ManagerBase
-from .manager_term_cfg import ActionTermCfg
+from .manager_base import ManagerBase, ManagerTermBase
+from .manager_term_cfg import ActionTermCfg, MultiDiscreteActionTermCfg
 
 if TYPE_CHECKING:
     from src.gamelab.envs.manager_based_env import ManagerBasedEnv
+
+class ActionTerm(ManagerTermBase):
+    """动作术语基类。"""
+    @property
+    @abstractmethod
+    def action_dim(self) -> int | List[int]:
+        """返回该术语占用的动作维度。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def __call__(self, action: torch.Tensor) -> None:
+        """应用动作。"""
+        raise NotImplementedError
+
+class MultiDiscreteActionTerm(ActionTerm):
+    """多维离散动作术语。"""
+    def __init__(self, cfg: MultiDiscreteActionTermCfg, env: ManagerBasedEnv):
+        super().__init__(cfg, env)
+        self.action_maps = cfg.action_maps
+        self._dims = [len(m) for m in self.action_maps]
+
+    def reset(self, env_ids: Sequence[int] | None = None) -> None:
+        """重置动作术语。"""
+        pass
+
+    @property
+    def action_dim(self) -> List[int]:
+        return self._dims
+
+    def __call__(self, action: torch.Tensor):
+        """分发动作。
+        
+        基于“逻辑-效能同构”原则：动作函数本身已是非阻塞的（通过 GhostScheduler），
+        因此直接在主线程调用即可，消除线程切换和队列开销。
+        """
+        actions_np = action.detach().cpu().numpy().astype(int)
+        
+        for env_id in range(self.num_envs):
+            env_action = actions_np[env_id]
+            for i, idx in enumerate(env_action):
+                fn = self.action_maps[i].get(idx)
+                if fn: fn()
 
 class ActionManager(ManagerBase):
     """动作管理器：实现基于术语的动作执行。
     
     继承自 ManagerBase，支持多动作项分发。
     """
-    def __init__(self, cfg: Dict[str, ActionTermCfg], env: ManagerBasedEnv):
-        super().__init__(cfg, env)
-        self._term_names = list(self.cfg.keys())
+    __slots__ = ["_term_dispatch_list", "action"]
 
-    @property
-    def active_terms(self) -> List[str]:
-        return self._term_names
+    def __init__(self, cfg: Dict[str, ActionTermCfg], env: ManagerBasedEnv):
+        self._term_dispatch_list = []
+        self.action: torch.Tensor = None
+        super().__init__(cfg, env)
 
     def _prepare_terms(self):
-        pass
+        """实例化动作术语对象并预计算切片索引，物理化执行路径。"""
+        start_idx = 0
+        
+        for name, term_cfg in self.cfg.items():
+            term = self._instantiate_term(term_cfg, MultiDiscreteActionTerm)
+            self._terms[name] = term
+            self._term_names.append(name)
+            
+            # 物理化切片逻辑
+            dim = term.action_dim
+            width = len(dim) if isinstance(dim, list) else dim
+            end_idx = start_idx + width
+            
+            # 预绑定分发闭包，消除 step 中的运行时计算
+            def dispatch_fn(action, s=start_idx, e=end_idx, t=term):
+                return t(action[:, s:e])
+            
+            self._term_dispatch_list.append(dispatch_fn)
+            start_idx = end_idx
 
-    def apply_action(self, action: torch.Tensor):
+    def step(self, action: torch.Tensor):
         """执行动作。
         
-        如果 action 是 tensor，则根据配置将其分发给对应的 Term。
-        目前假设 action 的第一维是环境数量，第二维是动作空间。
+        基于预绑定的分发列表，实现执行必然性。
         """
-        # 简单起见，目前仍优先处理第一个 Term
-        if self._term_names:
-            term_name = self._term_names[0]
-            term_cfg = self.cfg[term_name]
-            
-            # 获取动作内容
-            # 如果是 batched action [num_envs, action_dim]，取第一个环境
-            # 如果是单环境 action [action_dim]，直接使用
-            if action.ndim == 2:
-                action_to_apply = action[0]
-            else:
-                action_to_apply = action
-            
-            # 确保 action_to_apply 是可迭代的（对于 MultiDiscrete）
-            # 如果是 0-d tensor，转换为 1-d
-            if action_to_apply.ndim == 0:
-                action_to_apply = action_to_apply.unsqueeze(0)
-            
-            # 获取动作函数
-            fn = term_cfg.func(action_to_apply, **term_cfg.params)
-            
-            # 异步执行按键模拟
-            if callable(fn):
-                threading.Thread(target=fn, daemon=True).start()
-
-    def reset(self, env_ids: Sequence[int] | None = None):
-        return {}
+        self.action = action
+        for dispatch in self._term_dispatch_list:
+            dispatch(action)
 
     @property
     def action_term_dim(self) -> List[int]:
-        """返回动作项的维度列表。"""
-        dims = self.get_action_dim()
-        if isinstance(dims, int):
-            return [dims]
-        return list(dims)
+        """返回所有动作项的总维度列表。"""
+        dims = []
+        for name in self._term_names:
+            term: ActionTerm = self._terms[name]
+            dim = term.action_dim
+            if isinstance(dim, list):
+                dims.extend(dim)
+            else:
+                dims.append(dim)
+        return dims
 
-    def get_action_dim(self) -> int | List[int]:
-        """获取动作维度。"""
-        if self._term_names:
-            term_cfg = self.cfg[self._term_names[0]]
-            if 'dims' in term_cfg.params:
-                return term_cfg.params['dims']
-            return term_cfg.params.get('dim', 0)
-        return 0
+    @property
+    def action_space(self) -> spaces.MultiDiscrete:
+        """物理化指代动作空间。"""
+        return spaces.MultiDiscrete(self.action_term_dim)

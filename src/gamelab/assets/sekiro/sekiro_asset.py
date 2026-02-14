@@ -1,5 +1,6 @@
 from __future__ import annotations
 import torch
+import struct
 from typing import TYPE_CHECKING, Sequence, Dict, Any
 
 from ..asset_base import AssetBase
@@ -18,62 +19,46 @@ class SekiroAsset(AssetBase):
     def __init__(self, cfg: SekiroAssetCfg):
         super().__init__(cfg)
         self.cfg: SekiroAssetCfg = cfg
-        
-        # 初始化驱动
-        self.driver = TelemetryDriver(self.cfg.process_name)
         self.base_address = None
-        
-        # 初始化数据容器 (目前固定为 1 个环境，支持未来扩展)
+        self.driver = TelemetryDriver(self.cfg.process_name)
         self._data = SekiroAssetData(num_envs=1, device=self.cfg.device)
         
         self._initialize_driver()
 
     def _initialize_driver(self):
-        """连接进程并寻找特征码基址。"""
-        if self.driver.connect():
-            results = self.driver.pattern_scan_all(self.cfg.signature)
-            if results:
-                self.base_address = results
-                self._is_initialized = True
-                print(f"[SekiroAsset] 找到遥测区签名，基址: {hex(self.base_address)}")
-            else:
-                print("[SekiroAsset] 警告：未找到遥测区签名！")
+        """连接进程并寻找特征码基址。违约即抛出异常。"""
+        self.driver.connect()
+        results = self.driver.pattern_scan_all(self.cfg.signature)
+        if not results:
+            raise RuntimeError(f"[SekiroAsset] 未找到遥测区签名 ({self.cfg.signature.hex()})。请检查游戏版本或签名配置。")
+            
+        self.base_address = results
+        self._is_initialized = True
+        print(f"[SekiroAsset] 找到遥测区签名，基址: {hex(self.base_address)}")
 
     @property
     def data(self) -> SekiroAssetData:
         return self._data
 
-    def _read_r32(self, offset: int) -> int:
-        if self.base_address:
-            return self.driver.read_int(self.base_address + offset)
-        return 0
-
     def update(self, dt: float):
-        """执行内存读取并更新 Tensor 缓冲区。"""
-        if not self._is_initialized or not self.driver.pm:
-            self._initialize_driver()
-            if not self._is_initialized:
-                return
+        """执行内存读取并更新 Tensor 缓冲区。
+        
+        基于“必然性”原则：如果未初始化，应在外部 setup 阶段拦截，而不是在此处卑微修补。
+        """
+        if not self._is_initialized: return
 
         # 0. 备份上一帧状态
-        self._data.update_prev()
+        self._data.backup()
 
-        # 1. 批量读取原始数据 (偏移对标 telemetry.py)
-        raw_values = {
-            "player_hp": self._read_r32(12),
-            "player_hp_max": self._read_r32(16),
-            "player_posture": self._read_r32(24),
-            "player_posture_max": self._read_r32(28),
-            "enemy_hp": self._read_r32(32),
-            "enemy_hp_max": self._read_r32(36),
-            "enemy_posture": self._read_r32(44),
-            "enemy_posture_max": self._read_r32(48),
-            "player_deaths": self._read_r32(52),
-            "enemy_deaths": self._read_r32(56),
-        }
-
-        # 2. 同步到 Tensor 缓冲区
-        self._data.update_from_dict(raw_values)
+        # 1. 追求零成本抽象：批量读取原始字节并解包
+        # 范围：从偏移 12 到 60 (共 48 字节)
+        raw_data = self.driver.read_bytes(self.base_address + 12, 48)
+        
+        # 使用 struct.unpack 一次性解析所有字段 (I=uint32, 4x=4 bytes padding)
+        values = struct.unpack("<II4xIIII4xIIII", raw_data)
+        
+        # 3. 直接同步到 Tensor 缓冲区，消除字典和重复读取开销
+        self._data.update_from_raw(values)
 
     def reset(self, env_ids: Sequence[int] | None = None):
         """重置资产状态。"""

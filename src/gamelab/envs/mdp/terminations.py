@@ -3,12 +3,11 @@
 """
 
 def time_out_termination(env, **kwargs) -> bool:
+    """基于步数的超时终止。
+    
+    基于强契约：环境必须具备步数和配置。
     """
-    基于步数的超时终止。
-    """
-    if hasattr(env, "step_count") and hasattr(env.cfg, "max_episode_steps"):
-        return env.step_count >= env.cfg.max_episode_steps
-    return False
+    return env.common_step_counter >= env.cfg.max_episode_steps
 
 def illegal_state_termination(env, **kwargs) -> bool:
     """

@@ -1,8 +1,6 @@
 import argparse
-import sys
 import torch
-import os
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from src.tasks.registration import task_registry
 import src.tasks # 确保所有任务都被注册
@@ -16,8 +14,7 @@ class AppLauncher:
     def __init__(self, launcher_args: Optional[argparse.Namespace] = None):
         """初始化启动器。
         
-        Args:
-            launcher_args: 预解析的命令行参数。如果为 None，则尝试解析 sys.argv。
+        基于“执行必然性”原则：设备设置应一次性确定。
         """
         if launcher_args is None:
             parser = argparse.ArgumentParser(description="Sekiro-RL 应用程序启动器")
@@ -26,13 +23,11 @@ class AppLauncher:
         else:
             self.args = launcher_args
 
-        # 设置设备
+        # 确立设备契约
         self.device = self.args.device
         if "cuda" in self.device and not torch.cuda.is_available():
-            print(f"[WARN] CUDA 不可用，回退到 CPU")
-            self.device = "cpu"
+            raise RuntimeError(f"[AppLauncher] CUDA 请求失败：设备 {self.device} 不可用。")
         
-        # 导出给外部使用
         self.task_name = self.args.task
         self.num_envs = self.args.num_envs
         self.headless = self.args.headless
@@ -78,19 +73,3 @@ class AppLauncher:
             default=False,
             help="是否录制视频"
         )
-
-    def create_env(self, **kwargs) -> Any:
-        """根据启动器配置创建环境实例。"""
-        print(f"[INFO] 正在创建任务: {self.task_name} (envs={self.num_envs}, device={self.device})")
-        
-        # 合并参数
-        env_kwargs = {
-            "num_envs": self.num_envs,
-            "device": self.device,
-            "headless": self.headless,
-        }
-        env_kwargs.update(kwargs)
-        
-        # 从注册表创建
-        env, env_cfg = task_registry.make(self.task_name, **env_kwargs)
-        return env, env_cfg

@@ -34,6 +34,13 @@ class InteractiveScene:
         for asset in self.assets.values():
             asset.reset(env_ids)
 
+    def write_data_to_sim(self):
+        """将 Python 层资产数据写入仿真器（对标 Isaac Lab）。
+        
+        目前《只狼》任务主要通过 Telemetry 读取内存，暂无反向写入需求。
+        """
+        pass
+
     def __getitem__(self, key: str) -> AssetBase:
         """获取指定名称的资产。"""
         return self.assets[key]

@@ -1,50 +1,64 @@
 from __future__ import annotations
 import torch
+from abc import abstractmethod
 from typing import TYPE_CHECKING, Dict, List, Any, Sequence
-from .manager_base import ManagerBase
+from .manager_base import ManagerBase, ManagerTermBase
 from .manager_term_cfg import EventTermCfg
 
 if TYPE_CHECKING:
     from src.gamelab.envs.manager_based_env import ManagerBasedEnv
 
-class EventManager(ManagerBase):
-    """事件管理器：负责根据状态变化检测发生的事件。
-    
-    继承自 ManagerBase，对标 Isaac Lab。
-    """
-    def __init__(self, cfg: Dict[str, EventTermCfg], env: ManagerBasedEnv):
-        super().__init__(cfg, env)
-        self._term_names = list(self.cfg.keys())
+class EventTerm(ManagerTermBase):
+    """事件术语基类。"""
+    @abstractmethod
+    def __call__(self) -> List[Any]:
+        """检测事件。必须返回触发的事件列表。"""
+        raise NotImplementedError
 
-    @property
-    def active_terms(self) -> List[str]:
-        return self._term_names
-
-    def _prepare_terms(self):
-        pass
-
-    def compute_events(self, prev_metrics: Any, next_metrics: Any) -> List[Any]:
-        """遍历配置中的所有事件项并执行。"""
-        triggered_events = []
-        for name, term_cfg in self.cfg.items():
-            result = term_cfg.func(
-                env=self._env,
-                prev_metrics=prev_metrics,
-                next_metrics=next_metrics,
-                **term_cfg.params
-            )
+class StandardEventTerm(EventTerm):
+    """标准事件术语（包装旧的函数式逻辑）。"""
+    def __call__(self) -> List[Any]:
+        # 执行逻辑 (不再传递 metrics)
+        result = self.cfg.func(
+            env=self._env,
+            **self.cfg.params
+        )
+        
+        # 归一化逻辑
+        if result is None:
+            return []
             
-            if isinstance(result, bool):
-                if result:
-                    event_id = term_cfg.params.get("event_id", name)
-                    triggered_events.append(event_id)
-            elif result is not None:
-                if isinstance(result, list):
-                    triggered_events.extend(result)
-                else:
-                    triggered_events.append(result)
-                    
-        return triggered_events
+        if isinstance(result, bool):
+            return [self.cfg.event_id] if result and self.cfg.event_id else []
+            
+        if isinstance(result, list):
+            return result
+            
+        return [result]
 
-    def reset(self, env_ids: Sequence[int] | None = None):
-        return {}
+class EventManager(ManagerBase):
+    """事件管理器：实现基于术语的事件检测与处理。
+    
+    支持在环境重置或步进时触发特定的物理/状态变更。
+    """
+    _TERM_CLASS = StandardEventTerm
+
+    def __init__(self, cfg: Dict[str, EventTermCfg], env: ManagerBasedEnv):
+        self.recent_events = []
+        super().__init__(cfg, env)
+
+    def step(self, mode: str = "reset") -> List[Any]:
+        """遍历所有事件项并检测。对标 Isaac Lab。"""
+        triggered_events = []
+        for name in self._term_names:
+            term_cfg = self.cfg[name]
+            if term_cfg.mode != mode:
+                continue
+                
+            term: EventTerm = self._terms[name]
+            events = term()
+            if events:
+                triggered_events.extend(events)
+                    
+        self.recent_events = triggered_events
+        return triggered_events

@@ -1,6 +1,6 @@
-from src.gamelab.utils.configclass import configclass
+from dataclasses import dataclass
 
-@configclass
+@dataclass
 class SekiroCharacterSchemaCfg:
     """定义《只狼》角色的核心物理与逻辑属性模板。
     

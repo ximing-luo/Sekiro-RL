@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Dict
 from ..asset_base_cfg import AssetBaseCfg
-from src.gamelab.utils.configclass import configclass
 from . import keys
 
-@configclass
+@dataclass
 class SekiroAssetCfg(AssetBaseCfg):
     """Sekiro 资产的配置类。"""
     

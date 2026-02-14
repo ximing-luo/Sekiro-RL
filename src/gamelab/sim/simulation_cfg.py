@@ -1,7 +1,7 @@
+from dataclasses import dataclass
 from typing import Literal, Optional
-from src.gamelab.utils.configclass import configclass
 
-@configclass
+@dataclass
 class SimulationCfg:
     """仿真环境的基础配置。
     
@@ -25,6 +25,9 @@ class SimulationCfg:
     
     use_gpu_pipeline: bool = True
     """是否使用 GPU 加速数据流（如 Vision Tensor 直接在 GPU 上处理）。"""
+
+    debug_vis_fps: int = 0
+    """调试可视化窗口的刷新频率 (FPS)。如果 <= 0，则不启动。"""
     
     def validate(self):
         """验证配置合法性。"""

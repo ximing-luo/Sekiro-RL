@@ -11,7 +11,6 @@ from stable_baselines3.common.logger import configure
 from src.framework.sb3.ppo_aux import AuxPPO
 from src.models.ppo_models import SekiroMultiInputExtractor
 from src.gamelab.utils.rl.sb3 import SekiroCombinedCallback
-from src.utils.import_utils import filter_kwargs
 import configs.config as config
 
 class SB3OnPolicyRunner:
@@ -29,7 +28,12 @@ class SB3OnPolicyRunner:
         # 1. 配置日志
         self.logger = configure(self.log_dir, ["stdout", "csv", "tensorboard"])
         
-        # 2. 准备模型参数
+        # 2. 准备参数 (模仿 IsaacLab：显式弹出非算法参数)
+        self.ppo_kwargs = vars(self.args).copy()
+        for key in ["experiment_name", "run_name", "resume", "checkpoint", 
+                    "steps", "save_freq", "num_envs", "task", "headless", "video"]:
+            self.ppo_kwargs.pop(key, None)
+
         self.policy_kwargs = dict(
             features_extractor_class=SekiroMultiInputExtractor,
             features_extractor_kwargs=dict(features_dim=512),
@@ -38,7 +42,6 @@ class SB3OnPolicyRunner:
         )
         
         # 3. 初始化模型
-        self.ppo_kwargs = filter_kwargs(AuxPPO, vars(self.args))
         self._setup_model()
         
         # 4. 挂载回调
@@ -51,7 +54,6 @@ class SB3OnPolicyRunner:
             self.model = AuxPPO.load(
                 checkpoint_path, 
                 env=self.env, 
-                device=self.device,
                 custom_objects=self.ppo_kwargs
             )
         else:
@@ -61,7 +63,6 @@ class SB3OnPolicyRunner:
                 self.env, 
                 verbose=1, # 日志打印级别:0-无输出, 1-进度表, 2-调试
                 policy_kwargs=self.policy_kwargs,
-                device=self.device,
                 **self.ppo_kwargs
             )
         self.model.set_logger(self.logger)
