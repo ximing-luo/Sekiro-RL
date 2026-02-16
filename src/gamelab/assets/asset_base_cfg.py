@@ -11,6 +11,9 @@ class AssetBaseCfg:
     name: str = "asset"
     """资产名称（如 'player', 'boss'）。"""
 
+    num_envs: int = 1
+    """资产所属的环境数量 (由 InteractiveScene 自动注入)。"""
+
     class_type: Any = None
     """关联的资产类。"""
     

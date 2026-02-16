@@ -25,8 +25,7 @@ MOVE_MAP = {
 
 SKILL_MAP = {
     0: _actions.no_op,
-    1: _actions.defense,
-    2: _actions.dodge_forward,
+    1: _actions.defense
 }
 
 # 维度信息供配置类使用

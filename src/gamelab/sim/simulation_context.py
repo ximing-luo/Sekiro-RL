@@ -84,6 +84,7 @@ class SimulationContext:
             self._debug_vis_runner = InputVisRunner(self.cfg.debug_vis_fps)
             self._debug_vis_runner.start()
             print(f"[INFO] 调试可视化已启动 (FPS={self.cfg.debug_vis_fps})")
+            self.vision_sensor = self.get_sensor("vision")
             
         # 4. 预热
         time.sleep(1.0)
@@ -113,6 +114,8 @@ class SimulationContext:
         # 检查手动暂停
         self._stasis()
         window_utils.activate_window(self.cfg.window_title)
+        if self._debug_vis_runner is not None:
+            self._debug_vis_runner.update(self.vision_sensor.get_data())
 
         # 更新时间戳（即使是实时游戏，我们也维持一个逻辑时钟）
         self._sim_time += self.cfg.dt

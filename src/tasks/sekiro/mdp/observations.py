@@ -27,8 +27,8 @@ def memory_metrics(env, **kwargs):
         data.enemy.hp_max,
         data.enemy.posture,
         data.enemy.posture_max,
-        data.status.player_deaths.float(),
-        data.status.enemy_deaths.float()
+        data.status.player_deaths,
+        data.status.enemy_deaths
     ], dim=-1)
     
     return metrics
@@ -46,8 +46,7 @@ def image_frame(env, **kwargs):
                 frame = frame.transpose(2, 0, 1)
             
             # 转换为 Tensor 并归一化 [3, H, W]
-            frame_tensor = torch.from_numpy(frame).to(env.device).float() / 255.0
-            
+            frame_tensor = torch.from_numpy(frame).to(env.device)
             # 扩展为 [num_envs, 3, H, W]
             return frame_tensor.unsqueeze(0).repeat(num_envs, 1, 1, 1)
             

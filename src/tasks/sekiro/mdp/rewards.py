@@ -24,7 +24,7 @@ def survival_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[
     skill_indices = action[:, 1]
 
     move_cost: float = -0.05
-    skill_cost: float = -0.02
+    skill_cost: float = -0.2
     rewards[move_indices != 0] += move_cost
     rewards[skill_indices != 0] += skill_cost
     
@@ -33,16 +33,22 @@ def survival_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[
 def player_death_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
     """玩家死亡奖励。"""
     rewards = th.zeros(env.num_envs, device=env.device)
-    # recent_events: [num_envs, num_events], 判断每行是否包含事件 0 (死亡)
-    death_mask = (env.event_manager.recent_events == 0).any(dim=1)
+    data = env.scene.sekiro.status
+    player_deads = data.player_deaths
+    prev_player_deads = data.prev_player_deaths
+    # 只要当前死亡次数大于上一帧，即视为发生死亡事件
+    death_mask = player_deads > prev_player_deads
     rewards[death_mask] = -10.0
     return rewards 
 
 def boss_death_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
     """Boss死亡奖励。"""
     rewards = th.zeros(env.num_envs, device=env.device)
-    # recent_events: [num_envs, num_events], 判断每行是否包含事件 1 (Boss死亡)
-    death_mask = (env.event_manager.recent_events == 1).any(dim=1)
+    data = env.scene.sekiro.status
+    enemy_deads = data.enemy_deaths
+    prev_enemy_deads = data.prev_enemy_deaths
+    # 只要当前Boss死亡次数大于上一帧，即视为发生击杀事件
+    death_mask = enemy_deads > prev_enemy_deads
     rewards[death_mask] = 10.0
     return rewards
 
@@ -54,7 +60,7 @@ def player_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequ
     prev_hp = data.prev_hp
     # 血量变化 = 当前血量 - 上一帧血量
     hp_delta = hp - prev_hp
-    rewards += hp_delta * 0.01  # 假设每掉 100 点血量奖励 0.01
+    rewards += hp_delta * 0.01  # 假设每掉 100 点血量奖励 1
     return rewards
 
 def boss_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -65,7 +71,7 @@ def boss_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequen
     prev_hp = data.prev_hp
     # 血量变化 = 当前血量 - 上一帧血量
     hp_delta = hp - prev_hp
-    rewards += hp_delta * 0.01  # 假设每掉 100 点血量奖励 0.01
+    rewards += hp_delta * 0.01  # 假设每掉 100 点血量奖励 1
     return rewards
 
 def player_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -76,7 +82,7 @@ def player_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Seq
     prev_posture = data.prev_posture
     # 架势变化 = 当前架势 - 上一帧架势
     posture_delta = posture - prev_posture
-    rewards += posture_delta * 0.01  # 假设每改变 100 点架势奖励 0.01
+    rewards += posture_delta * 0.01  # 假设每改变 100 点架势奖励 1
     return rewards 
 
 def boss_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor: 
@@ -87,5 +93,5 @@ def boss_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Seque
     prev_posture = data.prev_posture
     # 架势变化 = 当前架势 - 上一帧架势
     posture_delta = posture - prev_posture
-    rewards += posture_delta * 0.01  # 假设每改变 100 点架势奖励 0.01
+    rewards += posture_delta * 0.01  # 假设每改变 100 点架势奖励 1
     return rewards

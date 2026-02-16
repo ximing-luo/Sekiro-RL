@@ -23,8 +23,9 @@ class InteractiveScene:
             asset_cfg.validate()
             asset_cfg.device = self.device
             asset_cfg.name = name
+            asset_cfg.num_envs = self.cfg.num_envs
             self.assets[name] = asset_cfg.class_type(asset_cfg)
-
+           
     def update(self, dt: float):
         """同步场景中所有资产的状态。"""
         for asset in self.assets.values():

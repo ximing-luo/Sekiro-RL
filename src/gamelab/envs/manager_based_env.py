@@ -44,6 +44,7 @@ class ManagerBasedEnv:
 
         # 记录环境步数
         self.common_step_counter = 0
+        self.episode_length_buf = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
 
     @property
     def num_envs(self) -> int:
@@ -103,6 +104,7 @@ class ManagerBasedEnv:
             
         self.scene.reset(env_ids)
         self.action_manager.reset(env_ids)
+        self.episode_length_buf[env_ids] = 0
         self.reward_manager.reset(env_ids)
         self.termination_manager.reset(env_ids)
         self.event_manager.reset(env_ids)
@@ -133,6 +135,7 @@ class ManagerBasedEnv:
         obs = self.observation_manager.step()
         
         self.common_step_counter += 1
+        self.episode_length_buf += 1
         
         # 封装 info
         info = {

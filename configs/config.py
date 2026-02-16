@@ -11,11 +11,12 @@ class SceneConfig:
     camera_width: int = 1920
     camera_height: int = 1080
     pos: str = "top_right"
+    num_envs: int = 1
 
 @dataclass(frozen=True)
 class UIConfig:
     """内存映射与 UI 窗口配置。"""
-    debug_vis_fps: int = 60
+    debug_vis_fps: int = 0
 
 @dataclass(frozen=True)
 class RLConfig:
@@ -33,14 +34,14 @@ class TrainConfig:
     # -- PPO 特有
     n_steps: int = 2048
     n_epochs: int = 5
-    target_kl: float = 0.05
+    target_kl: float = 1.0
     ent_coef: float = 0.01
     clip_range: float = 0.5
     clip_range_vf: float = 0.5
     max_grad_norm: float = 5.0
     vf_coef: float = 0.8
     # -- 辅助任务
-    aux_coef: float = 0.05
+    aux_coef: float = 1.0
 
 @dataclass(frozen=True)
 class EpsilonConfig:

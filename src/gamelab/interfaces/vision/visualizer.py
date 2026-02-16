@@ -65,7 +65,6 @@ class InputVisRunner:
                     time.sleep(0.01)
                     continue
                 
-                # 策略分发：消除气态的 if-elif 嵌套，逻辑直达
                 strategy = self._select_strategy(seq)
                 if strategy:
                     strategy(seq)

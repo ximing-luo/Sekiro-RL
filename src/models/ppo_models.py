@@ -121,7 +121,7 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        if observations.dtype == torch.uint8:
+        if observations.max() > 1.0:
             observations = observations.float() / 255.0
             
         return self.linear(self.cnn(observations))

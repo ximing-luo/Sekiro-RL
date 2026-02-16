@@ -10,7 +10,7 @@ class SekiroAssetCfg(AssetBaseCfg):
     from .sekiro_asset import SekiroAsset
     class_type: type = SekiroAsset
     
-    process_name: str = "sekiro.exe"
+    process_name: str = "Sekiro.exe"
     """游戏进程名称。"""
     
     signature: bytes = b"SEKIRO_TLM"
