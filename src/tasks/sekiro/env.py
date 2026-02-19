@@ -32,11 +32,6 @@ class Sekiro(ManagerBasedRLEnv):
         """执行一步并返回奖励。"""
         return super().step(action)
 
-    def render_debug(self, seq_np):
-        """更新调试可视化输入。"""
-        if hasattr(self, '_input_vis_runner') and self._input_vis_runner:
-            self._input_vis_runner.update(seq_np)
-
 if __name__ == '__main__':
     # 测试代码
     cfg = SekiroEnvCfg()

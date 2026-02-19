@@ -2,32 +2,27 @@ import torch
 import torch.nn as nn
 from typing import Dict
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from src.models.resnet import BasicBlock, BottleNeck
+from src.model.components import BasicBlock, BottleNeck, SEBlock
 from gymnasium import spaces
+import torch.nn.functional as F
 
-class SEBlock(nn.Module):
+class Focus(nn.Module):
     """
-    Squeeze-and-Excitation Block (通道注意力机制)
-    通过全局平均池化捕捉通道间的全局统计信息，学习通道重要性权重。
+    Focus layer (Space-to-Depth): 将空间信息切片并堆叠到通道维度。
+    作用：无损下采样，大幅降低计算量。
+    输入：(B, C, H, W) -> 输出：(B, C*4, H/2, W/2)
     """
-    def __init__(self, channels, reduction=4):
+    def __init__(self):
         super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(channels, channels // reduction, bias=False),
-            nn.SiLU(inplace=True),
-            nn.Linear(channels // reduction, channels, bias=False),
-            nn.Sigmoid()
-        )
 
     def forward(self, x):
-        b, c, _, _ = x.size()
-        # 1. Squeeze: (B, C, H, W) -> (B, C)
-        y = self.avg_pool(x).view(b, c)
-        # 2. Excitation: (B, C) -> (B, C, 1, 1)
-        y = self.fc(y).view(b, c, 1, 1)
-        # 3. Reweight
-        return x * y.expand_as(x)
+        # x(b,c,w,h) -> y(b,4c,w/2,h/2)
+        return torch.cat([
+            x[..., ::2, ::2],
+            x[..., 1::2, ::2],
+            x[..., ::2, 1::2],
+            x[..., 1::2, 1::2]
+        ], dim=1)
 
 class SekiroStableExtractor(BaseFeaturesExtractor):
     """
@@ -39,55 +34,57 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
     3. GroupNorm：使用组归一化替代 BatchNorm，增强在 RL 采样阶段（Batch Size=1）的稳定性。
     4. LayerNorm：在全连接层前添加层归一化，防止梯度爆炸。
     5. 采用 BasicBlock 替代 BottleNeck，减少参数并增加训练稳定性。
+    6. [New] 极限压榨架构：Focus + Heavy Middle + Capped Width。
     """
     def __init__(self, observation_space, features_dim=512):
         super().__init__(observation_space, features_dim)
         n_input_channels = observation_space.shape[0] # 通常为 3 (RGB)
         
-        self.in_channels = 32
+        self.in_channels = 32  # Stem 输出通道数
         
-        # 1. 输入模块：降低下采样攻击性，保留更多空间细节
-        # 引入谱归一化和 SEBlock 增强特征提取的辨识度
-        # 图像：240x135 -> 120x68
-        self.conv1 = nn.Sequential(
-            nn.utils.spectral_norm(nn.Conv2d(n_input_channels, 32, kernel_size=3, stride=2, padding=1, bias=False)),
-            SEBlock(32),
+        # 1. 输入模块：Focus + 1x1 卷积
+        # 预处理：Resize (240x135) -> Focus -> (120x67)
+        # 通道：3 -> 12 -> 64
+        self.stem = nn.Sequential(
+            Focus(),
+            nn.Conv2d(n_input_channels * 4, 32, kernel_size=1, bias=False),
+            nn.GroupNorm(8, 32),
             nn.SiLU(inplace=True)
         )
         
-        # 2. 残差层阶段 (使用 BasicBlock)
-        # 120x68 -> 60x34
-        self.layer1 = self._make_layer(BasicBlock, 64, 2, 2)
-        # 60x34 -> 30x17
-        self.layer2 = self._make_layer(BasicBlock, 128, 2, 2)
-        # 30x17 -> 15x9
-        self.layer3 = self._make_layer(BasicBlock, 256, 2, 2)
+        # 2. 残差层阶段 (Heavy Middle 策略)
+        # Stage 1: 120x67 -> 120x67 (保持分辨率)
+        self.layer1 = self._make_layer(BasicBlock, 32, 1, 1)
+        # Stage 2: 120x67 -> 60x34
+        self.layer2 = self._make_layer(BasicBlock, 64, 2, 2)
+        # Stage 3: 60x34 -> 30x17 (思考核心)
+        self.layer3 = self._make_layer(BasicBlock, 128, 4, 2)
+        # Stage 4: 30x17 -> 15x9 (宽度克制，保持 256)
+        self.layer4 = self._make_layer(BasicBlock, 128, 2, 2)
         
-        # 3. 破局改进：保留空间语义的聚合方式
-        # 使用 1x1 卷积进行跨通道语义整合，将 256 通道精炼为 64 通道
-        self.bottleneck = nn.Sequential(
-            nn.Conv2d(256 * BasicBlock.expansion, 64, kernel_size=1, bias=False),
-            nn.GroupNorm(8, 64),
-            nn.SiLU(inplace=True)
-        )
-        
-        # 使用较大的池化目标尺寸 (4x7)，保留空间拓扑结构
-        self.spatial_pool = nn.AdaptiveAvgPool2d((4, 7))
+        # 3. 空间感知池化
+        # 放弃 1x1 Global Pool，保留 (3, 5) 网格
+        # 3行：上/中/下段
+        # 5列：左/中左/中/中右/右
+        self.spatial_pool = nn.AdaptiveAvgPool2d((3, 5))
         
         self.cnn = nn.Sequential(
-            self.conv1,
+            self.stem,
             self.layer1,
             self.layer2,
             self.layer3,
-            self.bottleneck,
+            self.layer4,
             self.spatial_pool,
             nn.Flatten(),
         )
 
-        # 动态计算卷积后的输出维度 (64 * 4 * 7 = 1792)
+        # 动态计算卷积后的输出维度 (256 * 3 * 5 = 3840)
+        # 注意：这里我们手动模拟一次 Resize 后的 forward
         with torch.no_grad():
-            sample_input = torch.zeros(1, *observation_space.shape)
-            n_flatten = self.cnn(sample_input).shape[1]
+            # 假设输入是任意大小，经过 resize 后变为 240x136
+            # 但为了计算 shape，我们需要模拟 resize 后的 tensor
+            dummy_resized = torch.zeros(1, n_input_channels, 136, 240)
+            n_flatten = self.cnn(dummy_resized).shape[1]
 
         # 4. 强化线性层语义分析能力
         self.linear = nn.Sequential(
@@ -104,25 +101,22 @@ class SekiroStableExtractor(BaseFeaturesExtractor):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, (nn.Conv2d, nn.Linear)):
-                # 针对 SiLU 的初始化增益修复：SiLU 近似于 LeakyReLU
-                # PyTorch 不原生支持 calculate_gain('SiLU')
                 gain = nn.init.calculate_gain('leaky_relu', 0.01)
-                
-                # 兼容谱归一化：如果使用了 spectral_norm，权重存储在 weight_orig 中
                 target_weight = m.weight_orig if hasattr(m, 'weight_orig') else m.weight
                 nn.init.orthogonal_(target_weight, gain=gain)
-                
-                if hasattr(m, 'bias') and m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm, nn.LayerNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
-        if observations.max() > 1.0:
+        # 0. 归一化 (兼容 uint8 和 float 输入)
+        if observations.dtype == torch.uint8:
             observations = observations.float() / 255.0
+        elif observations.max() > 1.0:
+            observations = observations.float() / 255.0
+            
+        # 1. 强制 Resize 到 240x136 (1080p 的 1/8 附近，微调为偶数)
+        # 这是为了确保 Focus 层能获得固定大小的输入，并大幅降低计算量
+        # 高度 135 -> 136 (偶数)，避免 Focus 切片时奇偶行数量不一致 (68 vs 67)
+        # align_corners=False 对于下采样通常更好
+        # x = F.interpolate(observations, size=(136, 240), mode='bilinear', align_corners=False)
             
         return self.linear(self.cnn(observations))
 

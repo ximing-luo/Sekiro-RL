@@ -66,3 +66,15 @@ class TelemetryDriver:
     def read_bytes(self, address: int, size: int) -> bytes:
         """读取字节块。"""
         return self.pm.read_bytes(address, size)
+
+    def write_int(self, address: int, value: int):
+        """写入 32 位整数。"""
+        self.pm.write_int(address, value)
+
+    def write_float(self, address: int, value: float):
+        """写入浮点数。"""
+        self.pm.write_float(address, value)
+
+    def write_bytes(self, address: int, data: bytes):
+        """写入字节块。"""
+        self.pm.write_bytes(address, data)

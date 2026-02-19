@@ -42,8 +42,9 @@ class RecorderManager(ManagerBase):
 
     def __init__(self, cfg: Dict[str, Any], env: ManagerBasedEnv):
         super().__init__(cfg, env)
-        self.save_dir = "outputs/data/demos"
-        os.makedirs(self.save_dir, exist_ok=True)
+        if cfg is not None:
+            self.save_dir = "outputs/data/demos"
+            os.makedirs(self.save_dir, exist_ok=True)
         # 为每个环境独立分配缓冲区，实现多轨并行记录
         self._buffers: List[List[Dict[str, Any]]] = [[] for _ in range(self.num_envs)]
         # 记录每个环境的轨迹计数，用于命名

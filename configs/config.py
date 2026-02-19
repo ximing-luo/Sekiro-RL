@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 class SceneConfig:
     """基础环境与采集配置。"""
     img_width: int = 240 # 从 480 降至 240
-    img_height: int = 135 # 从 270 降至 135
+    img_height: int = 136 # 从 270 降至 135
     capture_fps: int = 60
     target_fps: int = 60
     camera_index: int = 1
@@ -16,7 +16,7 @@ class SceneConfig:
 @dataclass(frozen=True)
 class UIConfig:
     """内存映射与 UI 窗口配置。"""
-    debug_vis_fps: int = 0
+    debug_vis_fps: int = 30
 
 @dataclass(frozen=True)
 class RLConfig:
@@ -26,22 +26,22 @@ class RLConfig:
 class TrainConfig:
     """训练超参数 (PPO/SB3)。"""
     # -- 基础
-    learning_rate: float = 1e-4
+    learning_rate: float = 2e-5
     gamma: float = 0.95
     batch_size: int = 64
     save_freq: int = 10000
-    steps: int = 100000
+    steps: int = 2048 * 50
     # -- PPO 特有
     n_steps: int = 2048
     n_epochs: int = 5
-    target_kl: float = 1.0
+    target_kl: float = 0.2
     ent_coef: float = 0.01
-    clip_range: float = 0.5
-    clip_range_vf: float = 0.5
+    clip_range: float = 0.3
+    clip_range_vf: float = 0.3
     max_grad_norm: float = 5.0
-    vf_coef: float = 0.8
+    vf_coef: float = 0.4
     # -- 辅助任务
-    aux_coef: float = 1.0
+    aux_coef: float = 0.035
 
 @dataclass(frozen=True)
 class EpsilonConfig:

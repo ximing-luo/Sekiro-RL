@@ -50,8 +50,9 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
             func=sekiro_mdp.observations.memory_metrics,
             low=0,
             high=np.inf,
+            scale=1/10000,
             shape=(10,),
-            dtype=np.int16
+            dtype=np.float32
         ),
     })
     
@@ -106,7 +107,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     # 允许在不修改 train.py 的情况下，通过配置挂载不同的观察/诊断工具
     callbacks: list = field(default_factory=lambda: [
         {
-            "class": "src.gamelab.utils.rl.sb3.SekiroCombinedCallback",
+            "class": "src.tasks.sekiro.utils.SekiroCombinedCallback",   
             "params": {"log_interval": config.cfg.path.tb_log_interval}
         }
     ])

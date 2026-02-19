@@ -9,8 +9,8 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.logger import configure
 
 from src.framework.sb3.ppo_aux import AuxPPO
-from src.models.ppo_models import SekiroMultiInputExtractor
-from src.gamelab.utils.rl.sb3 import SekiroCombinedCallback
+from src.model.ppo.spatial import SekiroMultiInputExtractor
+from src.tasks.sekiro.utils import SekiroCombinedCallback
 import configs.config as config
 
 class SB3OnPolicyRunner:

@@ -29,7 +29,6 @@ def main():
     torch.backends.cudnn.allow_tf32 = True
     torch.backends.cudnn.deterministic = False
     torch.backends.cudnn.benchmark = True
-
     # 1. 初始化启动器
     launcher = AppLauncher()
     

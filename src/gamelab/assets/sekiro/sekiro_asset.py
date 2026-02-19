@@ -89,4 +89,10 @@ class SekiroAsset(AssetBase):
     def reset(self, env_ids: Sequence[int] | None = None):
         """重置资产状态。"""
         # 立即更新一次以获取最新状态
+        self.reset_state()
         self.update(0.0)
+
+    def reset_state(self):
+        """重置敌我状态。"""
+        for i, (driver, base_addr) in enumerate(zip(self.drivers, self.base_addresses)):
+            driver.write_int(base_addr + 56, 1)

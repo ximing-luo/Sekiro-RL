@@ -28,11 +28,8 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         """
         # A. 动作空间：物理指代
         self.action_space = self.action_manager.action_space
-        
         # B. 观测空间：直接使用管理器提供的 Dict 空间
         self.observation_space = self.observation_manager.observation_space
-        
-        print(f"[ManagerBasedRLEnv] 物理化配置空间完成: {self.observation_space} (Dict Mode)")
 
     @property
     def action_dim(self):
