@@ -27,9 +27,9 @@ class TrainConfig:
     """训练超参数 (PPO/SB3)。"""
     # -- 基础
     learning_rate: float = 2e-5
-    gamma: float = 0.95
+    gamma: float = 0.91
     batch_size: int = 64
-    save_freq: int = 10000
+    save_freq: int = 8192+2048
     steps: int = 2048 * 50
     # -- PPO 特有
     n_steps: int = 2048
@@ -39,16 +39,16 @@ class TrainConfig:
     clip_range: float = 0.3
     clip_range_vf: float = 0.3
     max_grad_norm: float = 5.0
-    vf_coef: float = 0.4
+    vf_coef: float = 0.5
     # -- 辅助任务
-    aux_coef: float = 0.035
+    aux_coef: float = 0.01
 
 @dataclass(frozen=True)
 class EpsilonConfig:
     """探索策略参数 (Epsilon Greedy)。"""
     eps_start: float = 1.0
-    eps_end: float = 0.1
-    eps_decay: int = 50000
+    eps_end: float = 0.05
+    eps_decay: int = 10000
 
 @dataclass(frozen=True)
 class PERConfig:
@@ -63,7 +63,7 @@ class PathConfig:
     """路径与日志配置。"""
     model_path: str = "outputs/models/dqn_model.pth"
     log_dir: str = "logs"
-    tb_log_interval: int = 2000
+    tb_log_interval: int = 4096
 
 @dataclass(frozen=True)
 class GlobalConfig:

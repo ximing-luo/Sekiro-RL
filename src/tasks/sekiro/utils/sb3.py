@@ -14,7 +14,7 @@ class SekiroCombinedCallback(BaseCallback):
     2. 集成卷积层特征图可视化。
     3. 实时特征相似度监控（诊断特征坍缩）。
     """
-    def __init__(self, verbose=0, log_interval=1000):
+    def __init__(self, verbose=0, log_interval=2048):
         super().__init__(verbose)
         self.log_interval = log_interval
         self.hook_manager = None

@@ -37,7 +37,21 @@ class SB3VecEnvAdapter(VecEnv):
         注意：这是 SB3 架构的强制要求，虽然低效，但在不更换 RL 框架前无法避免。
         """
         # 1. 物理层同步
-        obs, rewards, term, trunc, infos = self.env.step(self._actions)
+        # 注意：这里接收的返回值可能是 Gym 风格的 (obs, reward, done, truncated, info)
+        # 或者是 IsaacLab 风格的 (obs, reward, done, info)
+        # 我们使用 *args 来兼容
+        step_result = self.env.step(self._actions)
+        
+        # 尝试解包
+        if len(step_result) == 5:
+             obs, rewards, term, trunc, infos = step_result
+        elif len(step_result) == 4:
+             # 兼容旧版 Gym 或某些自定义环境
+             obs, rewards, dones, infos = step_result
+             term = dones
+             trunc = torch.zeros_like(dones) # 假定没有截断
+        else:
+             raise ValueError(f"Unexpected step return length: {len(step_result)}")
 
         # 2. 核心数据搬运 (Batch Transfer)
         obs_np = self._obs_to_numpy(obs)
@@ -54,7 +68,20 @@ class SB3VecEnvAdapter(VecEnv):
                 if t:
                     info_list[i]["TimeLimit.truncated"] = True
 
-        # 协议 B: 奖励分项 (调试必须)
+        # 协议 B: 终端观测 (SB3 核心协议)
+        # 这里的逻辑是：如果环境发生了重置，infos 里应该包含 'terminal_observation'
+        if "terminal_observation" in infos:
+            term_obs = self._obs_to_numpy(infos["terminal_observation"])
+            if isinstance(term_obs, dict):
+                for i in range(self.num_envs):
+                    if done_np[i]:
+                        info_list[i]["terminal_observation"] = {k: v[i] for k, v in term_obs.items()}
+            else:
+                for i in range(self.num_envs):
+                    if done_np[i]:
+                        info_list[i]["terminal_observation"] = term_obs[i]
+
+        # 协议 C: 奖励分项 (调试必须)
         if "reward_components" in infos:
             # 批量搬运以减少 CUDA 同步开销
             rc_cpu = {k: v.cpu().numpy() for k, v in infos["reward_components"].items()}
@@ -78,6 +105,10 @@ class SB3VecEnvAdapter(VecEnv):
 
     def _obs_to_numpy(self, obs: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> VecEnvObs:
         """将 Torch 张量观测转换为 NumPy 数组。"""
+        # 如果是 Tuple（可能是 Gym Wrapper 的副作用），自动解包
+        if isinstance(obs, tuple) and len(obs) > 0 and (isinstance(obs[0], dict) or isinstance(obs[0], torch.Tensor)):
+            obs = obs[0]
+
         if isinstance(obs, dict):
             return {k: v.cpu().numpy() for k, v in obs.items()}
         return obs.cpu().numpy()

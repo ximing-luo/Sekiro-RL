@@ -78,6 +78,9 @@ class SekiroTelemetry:
         except Exception as e:
             # print(f"读取错误: {e}")
             return {}
+        
+    def write(self):
+        self.driver.write_int(self.base_address + 60, 1)
 
 def test_telemetry():
     print("开始测试 Sekiro 遥测功能...")
@@ -92,6 +95,7 @@ def test_telemetry():
 
     try:
         print("等待数据刷新 (持续 5 秒)...")
+        telemetry.write()
         for i in range(5000):
             # 获取数据
             all_data = telemetry.get_metrics()

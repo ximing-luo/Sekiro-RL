@@ -39,7 +39,7 @@ def player_death_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Seque
     # 只要当前死亡次数大于上一帧，即视为发生死亡事件
     death_mask = player_deads > prev_player_deads
     rewards[death_mask] = -10.0
-    if rewards.any(): print(f"\033[34mrewards: 玩家死亡触发: {rewards[death_mask].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[31mrewards: 玩家死亡触发: {[f'{x:.2f}' for x in rewards[death_mask].tolist()]}\033[0m")
     return rewards 
 
 def boss_death_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -51,7 +51,7 @@ def boss_death_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequenc
     # 只要当前Boss死亡次数大于上一帧，即视为发生击杀事件
     death_mask = enemy_deads > prev_enemy_deads
     rewards[death_mask] = 10.0
-    if rewards.any(): print(f"\033[31mrewards: BOSS死亡触发: {rewards[death_mask].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[31mrewards: BOSS死亡触发: {[f'{x:.2f}' for x in rewards[death_mask].tolist()]}\033[0m")
     return rewards
 
 def player_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -63,7 +63,7 @@ def player_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequ
     # 血量变化 = 当前血量 - 上一帧血量
     hp_delta = hp - prev_hp
     if hp_delta < 0: rewards += hp_delta * 0.01  # 假设每掉 100 点血量奖励 1
-    if rewards.any(): print(f"\033[34mrewards: 玩家血量变化: {rewards[rewards != 0].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[34mrewards: 玩家血量变化: {[f'{x:.2f}' for x in rewards[rewards != 0].tolist()]}\033[0m")
     return rewards
 
 def boss_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -75,7 +75,7 @@ def boss_health_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequen
     # 血量变化 = 当前血量 - 上一帧血量
     hp_delta = hp - prev_hp
     if hp_delta < 0: rewards += -hp_delta * 0.01  # 假设每掉 100 点血量奖励 1
-    if rewards.any(): print(f"\033[31mrewards: BOSS血量变化: {rewards[rewards != 0].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[31mrewards: BOSS血量变化: {[f'{x:.2f}' for x in rewards[rewards != 0].tolist()]}\033[0m")
     return rewards
 
 def player_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor:
@@ -87,7 +87,7 @@ def player_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Seq
     # 架势变化 = 当前架势 - 上一帧架势
     posture_delta = posture - prev_posture
     if posture_delta < 0: rewards += posture_delta * 0.01  # 假设每改变 100 点架势奖励 1
-    if rewards.any(): print(f"\033[34mrewards: 玩家架势条变化: {rewards[rewards != 0].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[34mrewards: 玩家架势条变化: {[f'{x:.2f}' for x in rewards[rewards != 0].tolist()]}\033[0m")
     return rewards 
 
 def boss_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Sequence[int] | None = None) -> th.Tensor: 
@@ -99,5 +99,5 @@ def boss_posture_reward(env: ManagerBasedEnv, cfg: RewardTermCfg, env_ids: Seque
     # 架势变化 = 当前架势 - 上一帧架势
     posture_delta = posture - prev_posture
     if posture_delta < 0: rewards += -posture_delta * 0.01  # 假设每改变 100 点架势奖励 1
-    if rewards.any(): print(f"\033[31mrewards: BOSS架势条变化: {rewards[rewards != 0].tolist()}\033[0m")
+    if rewards.any(): print(f"\033[31mrewards: BOSS架势条变化: {[f'{x:.2f}' for x in rewards[rewards != 0].tolist()]}\033[0m")
     return rewards

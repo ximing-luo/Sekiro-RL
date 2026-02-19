@@ -37,7 +37,7 @@ class SB3OnPolicyRunner:
         self.policy_kwargs = dict(
             features_extractor_class=SekiroMultiInputExtractor,
             features_extractor_kwargs=dict(features_dim=512),
-            net_arch=dict(pi=[512, 256], vf=[512, 256]),
+            net_arch=dict(pi=[512, 256, 128], vf=[768, 1024, 512, 256, 64]),
             activation_fn=nn.ReLU
         )
         

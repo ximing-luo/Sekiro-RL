@@ -82,7 +82,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
         "player_health": RewardTermCfg(func=sekiro_mdp.rewards.player_health_reward,weight=0.2),
         "boss_health": RewardTermCfg(func=sekiro_mdp.rewards.boss_health_reward,weight=0.5),
         "player_posture": RewardTermCfg(func=sekiro_mdp.rewards.player_posture_reward,weight=0.2),
-        "boss_posture": RewardTermCfg(func=sekiro_mdp.rewards.boss_posture_reward,weight=0.5),
+        "boss_posture": RewardTermCfg(func=sekiro_mdp.rewards.boss_posture_reward,weight=2.0),
         "survival": RewardTermCfg(func=sekiro_mdp.rewards.survival_reward,weight=1.0)
     })
     
@@ -90,6 +90,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     terminations: dict = field(default_factory=lambda: {
         "player_dead": TerminationTermCfg(func=sekiro_mdp.terminations.player_dead_termination),
         "boss_dead": TerminationTermCfg(func=sekiro_mdp.terminations.boss_dead_termination),
+        "time_out": TerminationTermCfg(func=sekiro_mdp.terminations.time_out_termination, time_out=True),
     })
 
     # 5.5 指令项配置 (Command Terms)

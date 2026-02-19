@@ -137,13 +137,25 @@ class ManagerBasedEnv:
         self.common_step_counter += 1
         self.episode_length_buf += 1
         
-        # 封装 info
+        # 封装 info (基础部分)
         info = {
             "time_out": time_out,
             "step": self.common_step_counter,
             "events": self.event_manager.recent_events,
             "reward_components": reward_components
         }
+        
+        # --- Auto-Reset Logic ---
+        # 检查是否有环境需要重置 (Terminated or Truncated)
+        # 注意：这里必须处理自动重置，以符合向量化环境的标准契约
+        dones = done | time_out
+        reset_env_ids = dones.nonzero(as_tuple=False).squeeze(-1)
+
+        if len(reset_env_ids) > 0:
+            terminal_obs = {k: v[reset_env_ids].clone() for k, v in obs.items()}
+            info["terminal_observation"] = terminal_obs
+            new_obs = self.reset(reset_env_ids)
+            obs = new_obs
         
         return obs, reward, done, time_out, info
 

@@ -95,4 +95,5 @@ class SekiroAsset(AssetBase):
     def reset_state(self):
         """重置敌我状态。"""
         for i, (driver, base_addr) in enumerate(zip(self.drivers, self.base_addresses)):
-            driver.write_int(base_addr + 56, 1)
+            driver.write_int(base_addr + 60, 1)
+            
