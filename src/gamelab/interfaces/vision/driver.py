@@ -38,10 +38,11 @@ class VisionDriver:
                 if not ret or observe is None:
                     continue
 
-                # 核心代码逻辑：读取帧、缩放、更新最新帧
+                # 核心代码逻辑：读取帧、缩放、颜色空间转换 (BGR -> RGB)、更新最新帧
                 observe_resize = cv2.resize(observe, (self.target_width, self.target_height), interpolation=cv2.INTER_AREA)
+                observe_rgb = cv2.cvtColor(observe_resize, cv2.COLOR_BGR2RGB)
                 # 确保是 HWC 格式的 numpy 数组，且内存连续
-                self.latest_frame = np.ascontiguousarray(observe_resize)
+                self.latest_frame = np.ascontiguousarray(observe_rgb)
 
                 if period > 0.0:
                     dt = time.time() - t0
@@ -89,12 +90,14 @@ if __name__ == '__main__':
     )
     capture.start()
     
+    cv2.namedWindow('VisionDriver Debug', cv2.WINDOW_NORMAL)
     print(f"开始预览 (Camera Index: {camera_idx})，按 'q' 键退出...")
     try:
         while True:
             if capture.latest_frame is not None:
-                # 显示采集到的画面
-                cv2.imshow('VisionDriver Debug', capture.latest_frame)
+                # 显示采集到的画面 (OpenCV 需要 BGR 格式，所以转换回去展示)
+                frame_bgr = cv2.cvtColor(capture.latest_frame, cv2.COLOR_RGB2BGR)
+                cv2.imshow('VisionDriver Debug', frame_bgr)
             
             # 等待 1ms 检查按键，按 'q' 键退出
             if cv2.waitKey(1) & 0xFF == ord('q'):

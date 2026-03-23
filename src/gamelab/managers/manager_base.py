@@ -76,7 +76,9 @@ class ManagerBase(ABC):
 
     def _prepare_terms(self):
         """从配置对象中准备术语信息。"""
-        if self._TERM_CLASS is None: return
+        if self._TERM_CLASS is None: 
+            print(f"[{self.__class__.__name__}] 未定义默认术语类 _TERM_CLASS，无法实例化术语。")
+            return
 
         for name, term_cfg in self.cfg.items():
             if term_cfg is not None:

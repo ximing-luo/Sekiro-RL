@@ -42,11 +42,17 @@ class CurriculumTermCfg(ManagerTermBaseCfg):
 @dataclass
 class ActionTermCfg(ManagerTermBaseCfg):
     """动作项配置。"""
+    n: int = 0
     
 @dataclass
 class MultiDiscreteActionTermCfg(ActionTermCfg):
     """多维离散动作项配置。"""
     action_maps: List[Dict[int, Callable]] = field(default_factory=list)
+
+@dataclass
+class MultiBinaryActionTermCfg(ActionTermCfg):
+    """多维二值动作项配置。"""
+    action_maps: List[Callable] = field(default_factory=list)
 
 @dataclass
 class RecorderTermCfg(ManagerTermBaseCfg):

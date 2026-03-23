@@ -13,7 +13,7 @@ def boss_dead_termination(env, env_ids=None, **kwargs) -> torch.Tensor:
     """Boss 死亡导致回合结束。"""
     return env.scene.sekiro.status.enemy_deaths > env.scene.sekiro.status.prev_enemy_deaths
 
-def time_out_termination(env, env_ids=None, max_episode_steps: int = 512, **kwargs) -> torch.Tensor:
+def time_out_termination(env, env_ids=None, max_episode_steps: int = 2048, **kwargs) -> torch.Tensor:
     """超时终止。
     
     需配合 ManagerBasedEnv.episode_length_buf 使用。

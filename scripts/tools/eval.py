@@ -1,3 +1,11 @@
+"""
+Sekiro-RL 评估工具 (Model Evaluator)
+加载已保存的观测数据，对模型进行离线推理性能和激活值分布测试。
+
+使用方法:
+python scripts/tools/eval.py
+"""
+
 import os
 import sys
 import torch

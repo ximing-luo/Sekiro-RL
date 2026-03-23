@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 @dataclass(frozen=True)
 class SceneConfig:
     """基础环境与采集配置。"""
-    img_width: int = 240 # 从 480 降至 240
-    img_height: int = 136 # 从 270 降至 135
+    img_width: int = 240
+    img_height: int = 128
     capture_fps: int = 60
     target_fps: int = 60
     camera_index: int = 1

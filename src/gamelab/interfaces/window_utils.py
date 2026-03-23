@@ -20,6 +20,9 @@ def activate_window(title: str):
         win32gui.SetForegroundWindow(hwnd)
         return True
     except Exception as e:
+        # 排除 SetForegroundWindow 常见的系统权限错误：(0, 'SetForegroundWindow', 'No error message is available')
+        if "SetForegroundWindow" in str(e) and (" 0 " in str(e) or "(0," in str(e)):
+            return False
         print(f"[WindowUtils] 激活窗口失败: {e}")
         return False
 

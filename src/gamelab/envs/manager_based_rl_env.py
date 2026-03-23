@@ -39,10 +39,7 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
     def reset(self, seed: int | None = None, options: dict | None = None) -> tuple[Dict, Dict]:
         """Gymnasium 标准重置。"""
         # 遵循 Gymnasium 标准处理 seed (虽然目前 sim 不支持 seed)
-        super().reset() # 调用 ManagerBasedEnv.reset
-        
-        # 获取初始观测
-        obs = self.observation_manager.step()
+        obs = super().reset() # 调用 ManagerBasedEnv.reset
         
         return obs, {}
 
@@ -51,4 +48,10 @@ class ManagerBasedRLEnv(ManagerBasedEnv, gym.Env):
         
         对齐 Isaac Lab：始终返回 Tensor 以支持多环境向量化。
         """
-        return super().step(action)
+        next_obs, reward, done, time_out, info = super().step(action)
+        
+        # 2. 处理 Auto-Reset 导致的 next_obs 是元组的情况
+        if isinstance(next_obs, tuple):
+            next_obs = next_obs[0]
+
+        return next_obs, reward, done, time_out, info

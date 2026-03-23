@@ -1,3 +1,11 @@
+"""
+Sekiro-RL 遥测探测工具 (Telemetry Probe)
+连接游戏进程并探测遥测数据基址，验证数据读取是否正常。
+
+使用方法:
+python scripts/tools/telemetry.py
+"""
+
 import os
 import sys
 import time
@@ -82,7 +90,7 @@ class SekiroTelemetry:
     def write(self):
         self.driver.write_int(self.base_address + 60, 1)
 
-def test_telemetry():
+def run_probe():
     print("开始测试 Sekiro 遥测功能...")
     telemetry = SekiroTelemetry()
     
@@ -94,7 +102,7 @@ def test_telemetry():
         return
 
     try:
-        print("等待数据刷新 (持续 5 秒)...")
+        print("等待数据刷新 (持续 5 秒)...s")
         telemetry.write()
         for i in range(5000):
             # 获取数据
@@ -131,4 +139,4 @@ def test_telemetry():
         print("遥测已停止。")
 
 if __name__ == "__main__":
-    test_telemetry()
+    run_probe()

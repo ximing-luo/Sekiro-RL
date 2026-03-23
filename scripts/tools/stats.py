@@ -1,3 +1,11 @@
+"""
+Sekiro-RL 模型统计工具 (Model Stats)
+计算并分析模型的参数量、显存占用以及 FLOPs 估算。
+
+使用方法:
+python scripts/tools/stats.py
+"""
+
 import os
 import sys
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -7,11 +7,13 @@ from src.gamelab.envs.manager_based_env_cfg import (
     ObservationTermCfg,
     TerminationTermCfg, 
     ActionTermCfg, 
+    MultiBinaryActionTermCfg,
     EventTermCfg,
     CommandTermCfg,
     RecorderTermCfg
 )
 from src.gamelab.managers.observation_manager import ObservationManager
+from src.gamelab.managers.recorder_manager import NpyRecorderTerm
 from src.gamelab.envs.manager_based_rl_env_cfg import ManagerBasedRLEnvCfg
 from src.gamelab.assets.sekiro.sekiro_asset_cfg import SekiroAssetCfg
 import src.gamelab.envs.mdp as mdp
@@ -58,10 +60,8 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
     
     # 3. 动作项配置 (Action Terms)
     actions: dict = field(default_factory=lambda: {
-        "body": sekiro_mdp.actions.body_action_cfg([
-            sekiro_mdp.actions.MOVE_MAP, 
-            sekiro_mdp.actions.SKILL_MAP
-        ])
+        "body": sekiro_mdp.actions.sekiro_bitmask_action_cfg(),
+        "mouse": sekiro_mdp.actions.sekiro_mouse_action_cfg()
     })
 
     # 3.5 事件项配置 (Event Terms)
@@ -101,7 +101,7 @@ class SekiroEnvCfg(ManagerBasedRLEnvCfg):
 
     # 5.6 记录项配置 (Recorder Terms)
     recorders: dict = field(default_factory=lambda: {
-        "basic": RecorderTermCfg(func=mdp.recorders.basic_recorder)
+        "data_recorder": RecorderTermCfg(class_type=NpyRecorderTerm)
     })
 
     # 7. 训练回调配置 (SB3 风格)

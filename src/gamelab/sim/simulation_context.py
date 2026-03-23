@@ -103,7 +103,7 @@ class SimulationContext:
                     print("[SimulationContext] 仿真已继续。")
                     break
 
-    def step(self, render: bool = True):
+    def step(self):
         """执行一个仿真步。
         
         在实时游戏中，这主要用于同步传感器数据并更新仿真时间。

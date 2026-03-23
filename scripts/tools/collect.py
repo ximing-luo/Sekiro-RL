@@ -1,3 +1,11 @@
+"""
+Sekiro-RL 采集工具 (Data Collector)
+启动环境并通过随机动作采集真实的观测数据（obs），用于 benchmark。
+
+使用方法:
+python scripts/tools/collect.py
+"""
+
 import os
 import sys
 import torch
@@ -12,7 +20,7 @@ if project_root not in sys.path:
 from src.tasks.registration import task_registry
 import src.tasks.sekiro  # 触发注册
 
-def collect_data(task_id="Sekiro-v0", num_frames=512, fps=30):
+def collect_data(task_id="Sekiro-v0", num_frames=512*20, fps=30):
     """
     启动只狼环境，通过随机动作采集真实观测数据并保存。
     """
@@ -38,9 +46,6 @@ def collect_data(task_id="Sekiro-v0", num_frames=512, fps=30):
         
         obs, info = env.reset()
         all_obs = []
-        
-        print("等待摄像头预热...")
-        time.sleep(2.0)
         
         print(f"\n准备就绪！开始采集 {num_frames} 帧数据...")
         start_time = time.time()
@@ -81,7 +86,7 @@ def collect_data(task_id="Sekiro-v0", num_frames=512, fps=30):
                 frame = frame.cpu().numpy()
             
             # 如果是单环境，移除 batch 维度 (1, C, H, W) -> (C, H, W)
-            if frame.ndim == 4 and frame.shape[0] == 1:
+            if frame.shape[0] == 1:
                 frame = frame.squeeze(0)
             
             # 关键修复：确保数据独立拷贝，防止引用导致所有帧都变成最后一帧

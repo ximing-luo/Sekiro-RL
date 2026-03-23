@@ -1,3 +1,11 @@
+"""
+Sekiro-RL 架构检查工具 (Architecture Checker)
+验证模型架构定义与 SB3 训练管线的兼容性。
+
+使用方法:
+python scripts/tools/check.py
+"""
+
 import os
 import sys
 import torch

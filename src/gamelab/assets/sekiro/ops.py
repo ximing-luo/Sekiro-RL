@@ -65,8 +65,8 @@ def use_items(): #使用道具
     s.enter(t, ReleaseKey, R)
    
 def lock_vision(): #锁定敌人
-    PressKey(Y)
-    s.enter(t, ReleaseKey, Y)
+    PressKey(X)
+    s.enter(t, ReleaseKey, X)
     
 def turn_left(): #视角向左
     PressKey(left)

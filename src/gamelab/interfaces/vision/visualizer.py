@@ -17,18 +17,12 @@ class InputVisRunner:
         self._window_initialized = False
         self._thread = None
 
-    def _display_4d(self, seq):
-        """显示 4D 序列 (B, C, H, W) 或 (T, C, H, W)"""
-        for i in range(seq.shape[0]):
-            if self._stop_event.is_set(): break
-            cv2.imshow("state_t", seq[i])
-            cv2.waitKey(1)
-            self._ensure_window_pos()
-            time.sleep(1 / self.fps)
-
     def _display_3d_rgb(self, seq):
         """显示 3D RGB 图像 (H, W, C)"""
-        cv2.imshow("state_t", seq)
+        # RGB -> BGR for cv2.imshow
+        img_bgr = cv2.cvtColor(seq, cv2.COLOR_RGB2BGR)
+        
+        cv2.imshow("state_t", img_bgr)
         cv2.waitKey(1)
         self._ensure_window_pos()
         time.sleep(1 / self.fps)
@@ -39,18 +33,40 @@ class InputVisRunner:
         for i in range(k):
             if self._stop_event.is_set(): break
             img = np.transpose(seq[3 * i: 3 * (i + 1)], (1, 2, 0))
-            cv2.imshow("state_t", img)
+            # RGB -> BGR for cv2.imshow
+            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
+            cv2.imshow("state_t", img_bgr)
+            cv2.waitKey(1)
+            self._ensure_window_pos()
+            time.sleep(1 / self.fps)
+
+    def _display_4d(self, seq):
+        """显示 4D 序列 (B, C, H, W) 或 (T, C, H, W)"""
+        for i in range(seq.shape[0]):
+            if self._stop_event.is_set(): break
+            # RGB -> BGR for cv2.imshow
+            img_bgr = cv2.cvtColor(seq[i].transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
+            
+            cv2.imshow("state_t", img_bgr)
             cv2.waitKey(1)
             self._ensure_window_pos()
             time.sleep(1 / self.fps)
 
     def _select_strategy(self, seq):
         """策略路由：根据张量维度选择显示策略。"""
+        # 1. 优先检查 3D RGB (HWC 格式)
+        if seq.ndim == 3 and seq.shape[-1] == 3:
+            return self._display_3d_rgb
+        
+        # 2. 检查 3D 堆叠 (C*T, H, W 格式)
+        if seq.ndim == 3:
+            return self._display_3d_stacked
+            
+        # 3. 检查 4D 序列 (B, C, H, W 或 T, C, H, W)
         if seq.ndim == 4:
             return self._display_4d
-        if seq.ndim == 3:
-            # 维度内分支：如果最后维度是3，认为是HWC格式，否则认为是堆叠格式
-            return self._display_3d_rgb if seq.shape[-1] == 3 else self._display_3d_stacked
+            
         return None
 
     def start(self):
@@ -59,15 +75,20 @@ class InputVisRunner:
         基于“视觉减法”原则：通过策略分发展平逻辑迷宫。
         """
         def display_loop():
+            # 阻塞等待：直到“有数据”或“要停止”
+            while self._seq_np is None:
+                if self._stop_event.is_set(): 
+                    return # 发现停止信号，直接原地解散
+                time.sleep(0.01)
+
+            # 策略在启动时确定一次即可
+            strategy = self._select_strategy(self._seq_np)
+            if not strategy:
+                return
+
+            # 主循环：持续展示状态帧，直到“要停止”
             while not self._stop_event.is_set():
-                seq = self._seq_np
-                if seq is None:
-                    time.sleep(0.01)
-                    continue
-                
-                strategy = self._select_strategy(seq)
-                if strategy:
-                    strategy(seq)
+                strategy(self._seq_np)
 
         t = threading.Thread(target=display_loop, daemon=True)
         t.start()

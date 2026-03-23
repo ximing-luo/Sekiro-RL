@@ -45,6 +45,8 @@ class ManagerBasedEnv:
         # 记录环境步数
         self.common_step_counter = 0
         self.episode_length_buf = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        # 缓存当前观测，供 Recorder 抓取 transition (s, a, r, s')
+        self._obs_buf: Optional[Dict[str, torch.Tensor]] = None
 
     @property
     def num_envs(self) -> int:
@@ -110,8 +112,10 @@ class ManagerBasedEnv:
         self.event_manager.reset(env_ids)
         self.command_manager.reset(env_ids)
         self.curriculum_manager.reset(env_ids)
+        self.recorder_manager.reset(env_ids)
         
-        return self.observation_manager.step()
+        self._obs_buf = self.observation_manager.step()
+        return self._obs_buf
 
     def step(self, action: torch.Tensor) -> tuple[Dict, torch.Tensor, torch.Tensor, torch.Tensor, Dict]:
         """执行一个环境步。
@@ -132,8 +136,18 @@ class ManagerBasedEnv:
         # 3. 结果解算
         reward, reward_components = self.reward_manager.step(self.sim.cfg.dt)
         done, time_out = self.termination_manager.step()
-        obs = self.observation_manager.step()
+        next_obs = self.observation_manager.step()
         
+        # 4. 记录数据 (在 obs 还是 self._obs_buf 时记录 transition)
+        self.recorder_manager.step(
+            obs=self._obs_buf,
+            action=action,
+            reward=reward,
+            next_obs=next_obs,
+            info={"reward_components": reward_components}
+        )
+        self._obs_buf = next_obs
+
         self.common_step_counter += 1
         self.episode_length_buf += 1
         
@@ -152,12 +166,12 @@ class ManagerBasedEnv:
         reset_env_ids = dones.nonzero(as_tuple=False).squeeze(-1)
 
         if len(reset_env_ids) > 0:
-            terminal_obs = {k: v[reset_env_ids].clone() for k, v in obs.items()}
+            terminal_obs = {k: v[reset_env_ids].clone() for k, v in next_obs.items()}
             info["terminal_observation"] = terminal_obs
             new_obs = self.reset(reset_env_ids)
-            obs = new_obs
+            next_obs = new_obs
         
-        return obs, reward, done, time_out, info
+        return next_obs, reward, done, time_out, info
 
     def activate_window(self):
         window_utils.activate_window(self.sim.cfg.window_title)
