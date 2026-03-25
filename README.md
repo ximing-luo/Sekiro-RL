@@ -28,6 +28,8 @@
 
 **Sekiro-RL** 是一个专为《只狼：影逝二度》设计的强化学习训练框架，旨在训练能够自主掌握游戏机制的智能体。项目借鉴了 **NVIDIA Isaac Lab** 的设计理念，采用管理器模式 (Manager-based Pattern) 实现高度解耦的环境配置与任务定义。
 
+![Sekiro-RL Demo](doc/image.png)
+
 ### 核心技术栈
 
 | 组件 | 技术选型 |

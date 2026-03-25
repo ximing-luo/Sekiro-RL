@@ -7,7 +7,7 @@ class SceneConfig:
     img_height: int = 128
     capture_fps: int = 60
     target_fps: int = 60
-    camera_index: int = 1
+    camera_index: int = 2
     camera_width: int = 1920
     camera_height: int = 1080
     pos: str = "top_right"

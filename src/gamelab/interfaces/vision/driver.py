@@ -63,6 +63,13 @@ class VisionDriver:
 if __name__ == '__main__':
     # 调试代码：实例化 VisionDriver 并显示画面
     # 默认使用配置中的参数，如果没有配置则手动指定
+    import os
+    import sys
+    # 确保项目根目录在路径中
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
     try:
         from configs.config import cfg
         camera_idx = cfg.scene.camera_index
@@ -71,6 +78,9 @@ if __name__ == '__main__':
         fps = cfg.scene.capture_fps
         t_width = cfg.scene.img_width
         t_height = cfg.scene.img_height
+        t_width = 480
+        t_height = 270
+        camera_idx = 2 # 需要根据实际情况调整
     except Exception as e:
         print(f"配置加载失败，使用默认参数: {e}")
         camera_idx = 1
