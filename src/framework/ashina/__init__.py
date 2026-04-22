@@ -1,4 +1,13 @@
-from . import data, policy, trainer, highlevel, env, evaluation, exploration, utils
-import tianshou.data
+from . import data, algorithm, trainer, highlevel, env, evaluation, exploration, utils
+import tianshou
 
-__all__ = ["data", "policy", "trainer", "highlevel", "env", "evaluation", "exploration", "utils"]
+__all__ = [
+    "data",
+    "algorithm",
+    "trainer",
+    "highlevel",
+    "env",
+    "evaluation",
+    "exploration",
+    "utils",
+]

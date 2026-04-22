@@ -1,20 +1,20 @@
 from typing import Dict, Any, Optional
 from ..data.collector import Collector
-from ..policy.base import BasePolicy
+from ..algorithm.base import Algorithm
 
 class OffPolicyTrainer:
     """
-    天授式 Trainer：调度 Collector 和 Policy。
+    天授式 Trainer：调度 Collector 和 Algorithm。
     """
     def __init__(
         self,
-        policy: BasePolicy,
+        algorithm: Algorithm,
         train_collector: Collector,
         test_collector: Optional[Collector] = None,
         batch_size: int = 64,
         update_per_step: float = 1.0,
     ):
-        self.policy = policy
+        self.algorithm = algorithm
         self.train_collector = train_collector
         self.test_collector = test_collector
         self.batch_size = batch_size
@@ -28,6 +28,6 @@ class OffPolicyTrainer:
         # 2. 从 Buffer 采样并学习
         if len(self.train_collector.buffer) >= self.batch_size:
             batch = self.train_collector.buffer.sample(self.batch_size)
-            result = self.policy.learn(batch)
+            result = self.algorithm.learn(batch)
             return result["loss"]
         return None

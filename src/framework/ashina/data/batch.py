@@ -8,37 +8,39 @@ class Batch:
     它像字典一样存储数据，但支持类似 Tensor 的索引、切片和合并操作。
     """
     def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        self.__dict__.update(kwargs)
 
     def __getitem__(self, index: Union[int, slice, np.ndarray, torch.Tensor]) -> 'Batch':
-        """支持对 Batch 内所有数据同步进行索引或切片"""
-        new_batch = Batch()
-        for k, v in self.__dict__.items():
-            if hasattr(v, "__getitem__"):
-                setattr(new_batch, k, v[index])
-            else:
-                setattr(new_batch, k, v)
-        return new_batch
+        """同步索引：所有属性必须支持索引（符合 RL Batch 定义）"""
+        return Batch(**{k: v[index] for k, v in self.__dict__.items()})
 
     def __len__(self) -> int:
-        """返回 Batch 的大小（以第一个属性的长度为准）"""
+        """返回 Batch 大小：显式迭代"""
         for v in self.__dict__.values():
-            if hasattr(v, "__len__"):
-                return len(v)
+            return len(v)
         return 0
 
     def to_torch(self, device: Optional[torch.device] = None) -> 'Batch':
-        """将 Batch 内所有 numpy 数组转换为 torch Tensor"""
+        """确定性转换：利用 torch.as_tensor 自动分发"""
         for k, v in self.__dict__.items():
-            if isinstance(v, np.ndarray):
-                tensor = torch.from_numpy(v)
-                if device:
-                    tensor = tensor.to(device)
-                setattr(self, k, tensor)
-            elif isinstance(v, torch.Tensor) and device:
-                setattr(self, k, v.to(device))
+            # 自动处理 numpy 和 tensor
+            t = torch.as_tensor(v, device=device)
+            # 强行收敛浮点精度
+            if t.dtype == torch.float64:
+                t = t.to(torch.float32)
+            self.__dict__[k] = t
         return self
+
+    def __getattr__(self, key: str) -> Any:
+        """
+        属性访问保护。
+        如果属性不存在，返回 None 而不是抛出异常，
+        这在处理某些算法可选的 Batch 键（如 weights, info）时非常优雅。
+        """
+        return self.__dict__.get(key, None)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.__dict__
 
     def keys(self):
         return self.__dict__.keys()
@@ -52,6 +54,7 @@ class Batch:
     def __repr__(self) -> str:
         s = "Batch(\n"
         for k, v in self.__dict__.items():
+            if k.startswith("_"): continue
             shape = getattr(v, "shape", "no shape")
             s += f"  {k}: {type(v).__name__} {shape},\n"
         s += ")"

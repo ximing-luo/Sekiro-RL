@@ -1,23 +1,23 @@
 from typing import Any, Dict, Optional
 import numpy as np
 from .batch import Batch
-from ..policy.base import BasePolicy
+from ..algorithm.base import Algorithm
 from .replay_buffer import ReplayBuffer
 
 class Collector:
     """
-    天授式 Collector：连接策略与环境的桥梁。
+    天授式 Collector：连接算法与环境的桥梁。
     职责：
-    1. 执行策略在环境中运行。
+    1. 执行算法包含的策略在环境中运行。
     2. 收集数据并存入 ReplayBuffer。
     """
     def __init__(
         self,
-        policy: BasePolicy,
+        algorithm: Algorithm,
         env: Any,
         buffer: Optional[ReplayBuffer] = None,
     ):
-        self.policy = policy
+        self.algorithm = algorithm
         self.env = env
         self.buffer = buffer
         self._obs = None
@@ -27,31 +27,50 @@ class Collector:
         """重置环境并初始化第一个观测值"""
         self._obs, _ = self.env.reset()
 
-    def collect(self, n_step: int = 1) -> Dict[str, Any]:
+    def collect(self, n_step: Optional[int] = None, n_episode: Optional[int] = None) -> Dict[str, Any]:
         """
-        执行 n 步采样并存入 buffer。
+        执行采样。可指定步数或 Episode 数量。
         """
-        rewards = []
-        for _ in range(n_step):
-            # 1. 策略前向传播得到动作
-            batch = Batch(obs=np.array([self._obs]))
-            result = self.policy.forward(batch)
-            action = result.act.item()
+        if n_step is not None:
+            rewards = []
+            for _ in range(n_step):
+                # 1. 算法前向传播得到动作
+                batch = Batch(obs=np.array([self._obs]))
+                result = self.algorithm(batch)
+                action = result.act.item()
 
-            # 2. 与环境交互
-            obs_next, rew, done, truncated, info = self.env.step(action)
-            
-            # 3. 存入 Buffer
-            if self.buffer is not None:
-                self.buffer.add(self._obs, action, rew, done)
+                # 2. 与环境交互
+                obs_next, rew, done, truncated, info = self.env.step(action)
+                
+                # 3. 存入 Buffer
+                if self.buffer is not None:
+                    self.buffer.add(self._obs, action, rew, done)
 
-            rewards.append(rew)
-            self._obs = obs_next
+                rewards.append(rew)
+                self._obs = obs_next
 
-            if done or truncated:
-                self.reset()
+                if done or truncated:
+                    self.reset()
+            return {"n_step": n_step, "rew": np.mean(rewards) if rewards else 0.0}
 
-        return {
-            "n_step": n_step,
-            "rew": np.mean(rewards) if rewards else 0.0,
-        }
+        if n_episode is not None:
+            episode_count = 0
+            all_rewards = []
+            while episode_count < n_episode:
+                batch = Batch(obs=np.array([self._obs]))
+                result = self.algorithm(batch)
+                action = result.act.item()
+                obs_next, rew, done, truncated, info = self.env.step(action)
+                
+                if self.buffer is not None:
+                    self.buffer.add(self._obs, action, rew, done)
+                
+                all_rewards.append(rew)
+                self._obs = obs_next
+                
+                if done or truncated:
+                    episode_count += 1
+                    self.reset()
+            return {"n_episode": n_episode, "rew": np.sum(all_rewards) / n_episode}
+
+        raise ValueError("Must specify either n_step or n_episode")
