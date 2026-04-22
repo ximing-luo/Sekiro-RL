@@ -35,23 +35,24 @@ class DQNPolicy(Policy):
         obs = torch.as_tensor(batch.obs, device=self.device, dtype=torch.float32)
         
         # 确定性预处理
-        obs = obs / 255.0 if obs.max() > 1.0 else obs
+        if obs.max() > 1.0:
+            obs = obs / 255.0
             
         # 处理数据输入（增加 batch 维度）
         if obs.ndim == 3:
             obs = obs.unsqueeze(0)
             
-        logits = self.model(obs)
+        q_values = self.model(obs)
         
         # epsilon-greedy 探索逻辑内聚到策略层
         if self.training and np.random.rand() < self.eps:
-            # 生成随机动作
-            act = torch.randint(0, self.action_dim, (logits.shape[0],), device=self.device)
+            # 探索 (Exploration): 生成随机动作
+            act = torch.randint(0, self.action_dim, (q_values.shape[0],), device=self.device)
         else:
-            # 贪婪动作
-            act = logits.argmax(dim=-1)
+            # 选择当前 Q 值最大的动作
+            act = q_values.argmax(dim=-1)
         
-        return Batch(logits=logits, act=act, state=state)
+        return Batch(q_values=q_values, act=act, state=state)
 
 class DQNAlgorithm(Algorithm):
     """
@@ -82,7 +83,6 @@ class DQNAlgorithm(Algorithm):
         """
         DQN 学习步骤。
         """
-        # 架构性修复：集中在 Batch.to_torch 中处理 dtype 与 device
         batch.to_torch(self.device)
         
         obs = batch.obs
@@ -96,26 +96,16 @@ class DQNAlgorithm(Algorithm):
         if weights is None:
             weights = torch.ones_like(rew)
             
-        # 1. 计算当前 Q 值
-        q_values = self.policy.model(obs)
-        # 架构性修复：使用 reshape(-1, 1) 并结合 q_values 的维度进行 gather
-        # 确保 q_values 是 (B, A) 形式，如果模型输出带额外维度（如历史堆叠），则先展平
-        if q_values.ndim > 2:
-            q_values = q_values.reshape(q_values.shape[0], -1)
-            
-        act_idx = act.reshape(-1, 1).long()
-        q_sa = q_values.gather(1, act_idx).squeeze(1)
+        # 1. 计算当前 Q 值 (维度收敛在 Batch 处理或模型输出层)
+        q_values = self.policy.model(obs).flatten(1)
+        q_sa = q_values.gather(1, act.view(-1, 1).long()).squeeze(1)
 
         # 2. 计算目标 Q 值 (Double DQN)
         with torch.no_grad():
-            next_q_eval = self.policy.model(next_obs)
-            if next_q_eval.ndim > 2:
-                next_q_eval = next_q_eval.reshape(next_q_eval.shape[0], -1)
+            next_q_eval = self.policy.model(next_obs).flatten(1)
             next_act = next_q_eval.argmax(1, keepdim=True)
             
-            next_q_tgt = self.target_net(next_obs)
-            if next_q_tgt.ndim > 2:
-                next_q_tgt = next_q_tgt.reshape(next_q_tgt.shape[0], -1)
+            next_q_tgt = self.target_net(next_obs).flatten(1)
             next_q_sa = next_q_tgt.gather(1, next_act).squeeze(1)
             
             target = rew.flatten() + self.gamma * (1.0 - done.to(torch.float32).flatten()) * next_q_sa.flatten()

@@ -28,7 +28,7 @@ class ReplayBuffer(BaseBuffer):
 
     def add(self, obs, action, reward, done):
         """添加一条经验。"""
-        # 架构性修复：第一次添加时初始化观测值数组
+        # 第一次添加时初始化观测值数组
         if self.observations is None:
             obs_shape = obs.shape
             self.observations = np.zeros((self.capacity, *obs_shape), dtype=obs.dtype)

@@ -44,6 +44,7 @@ class DummyVectorEnv(BaseVectorEnv):
             done_list.append(done)
             trunc_list.append(trunc)
             info_list.append(info)
+
         return (
             np.array(obs_list),
             np.array(rew_list),
