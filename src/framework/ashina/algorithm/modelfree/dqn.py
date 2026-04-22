@@ -19,6 +19,11 @@ class DQNPolicy(Policy):
     ):
         super().__init__(action_dim, device)
         self.model = model.to(self.device)
+        self.eps = 0.0
+
+    def set_eps(self, eps: float) -> None:
+        """设置 epsilon 探索率。"""
+        self.eps = eps
 
     def forward(
         self, 
@@ -32,12 +37,19 @@ class DQNPolicy(Policy):
         # 确定性预处理
         obs = obs / 255.0 if obs.max() > 1.0 else obs
             
-        # 确定性维度对齐
+        # 处理数据输入（增加 batch 维度）
         if obs.ndim == 3:
             obs = obs.unsqueeze(0)
             
         logits = self.model(obs)
-        act = logits.argmax(dim=-1)
+        
+        # epsilon-greedy 探索逻辑内聚到策略层
+        if self.training and np.random.rand() < self.eps:
+            # 生成随机动作
+            act = torch.randint(0, self.action_dim, (logits.shape[0],), device=self.device)
+        else:
+            # 贪婪动作
+            act = logits.argmax(dim=-1)
         
         return Batch(logits=logits, act=act, state=state)
 

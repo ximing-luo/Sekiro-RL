@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, Union
 
 class Batch:
     """
-    天授式核心数据结构：Batch。
+    核心数据结构：Batch。
     它像字典一样存储数据，但支持类似 Tensor 的索引、切片和合并操作。
     """
     def __init__(self, **kwargs):

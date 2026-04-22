@@ -5,8 +5,8 @@ from ..data.collector import Collector
 
 class Evaluator:
     """
-    Tianshou 2.0 风格的评估器。
-    在 2.0 中，评估通常通过独立的 Collector 在测试环境中运行若干 episode。
+    评估器。
+    评估通常通过独立的 Collector 在测试环境中运行若干 episode。
     """
     def __init__(
         self,
@@ -20,12 +20,14 @@ class Evaluator:
         """
         运行指定数量的 episode 并返回平均奖励。
         """
-        # 切换到评估模式
-        if hasattr(self.algorithm.policy.model, "eval"):
-            self.algorithm.policy.model.eval()
+        # 切换到评估模式 (关闭探索，如 EpsilonGreedy 或 Dropout)
+        self.algorithm.policy.eval()
 
         # 使用 Collector 的 n_episode 功能
         result = self.test_collector.collect(n_episode=n_episode)
+        
+        # 恢复训练模式
+        self.algorithm.policy.train()
         
         return {
             "test_reward": result["rew"],

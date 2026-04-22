@@ -5,7 +5,7 @@ import configs.config as config
 
 class ReplayBuffer(BaseBuffer):
     """
-    天授式经验回放缓冲区。
+    经验回放缓冲区。
     采用预分配 NumPy 数组存储，确保物理内存连续性与类型安全。
     """
     def __init__(self, size, frame_history_len=4, obs_shape=None, alpha=None, beta=None):
@@ -80,11 +80,6 @@ class ReplayBuffer(BaseBuffer):
             # 计算回溯的索引
             curr_idx = (idx - i) % self.capacity
             
-            # 架构性修复：必须检查回溯是否超出了当前有效数据的范围 (self.size)
-            # 或者是否跨越了 Episode 边界 (done)
-            
-            # 检查是否越过了最早的数据点
-            # 如果缓冲区未满，最早的点是 0；如果满了，最早的点是 self.pos
             is_out_of_buffer = False
             if self.size < self.capacity:
                 if (idx - i) < 0:

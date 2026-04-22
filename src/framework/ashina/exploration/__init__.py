@@ -1,3 +1,3 @@
-from .strategies import ExplorationStrategy, EpsilonGreedy, GaussianNoise
+from .random import BaseNoise, GaussianNoise, OUNoise
 
-__all__ = ["ExplorationStrategy", "EpsilonGreedy", "GaussianNoise"]
+__all__ = ["BaseNoise", "GaussianNoise", "OUNoise"]

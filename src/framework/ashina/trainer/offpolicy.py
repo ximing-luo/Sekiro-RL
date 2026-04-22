@@ -4,7 +4,7 @@ from ..algorithm.base import Algorithm
 
 class OffPolicyTrainer:
     """
-    天授式 Trainer：调度 Collector 和 Algorithm。
+    Trainer：调度 Collector 和 Algorithm。
     """
     def __init__(
         self,

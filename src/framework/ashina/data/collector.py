@@ -6,7 +6,7 @@ from .replay_buffer import ReplayBuffer
 
 class Collector:
     """
-    天授式 Collector：连接算法与环境的桥梁。
+    数据采集器（Collector）：连接算法与环境的桥梁。
     职责：
     1. 执行算法包含的策略在环境中运行。
     2. 收集数据并存入 ReplayBuffer。

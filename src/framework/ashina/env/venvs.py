@@ -4,7 +4,7 @@ import numpy as np
 
 class BaseVectorEnv(ABC):
     """
-    矢量化环境基类。对标 Tianshou 2.0 的 venvs.py。
+    矢量化环境基类。
     """
     def __init__(self, env_fns: List[Callable[[], Any]]):
         self.env_num = len(env_fns)

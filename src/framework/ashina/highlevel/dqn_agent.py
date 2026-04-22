@@ -21,7 +21,7 @@ class DQNAgent(BaseAgent):
         self.model_file = model_file or config.cfg.path.model_path
         
         # 1. 实例化模型 (架构性修复：使用通用的 Sequential 结构，降低对外部特定模型的耦合)
-        # 强制契约：env 必须具有 observation_space.shape
+        # env 必须具有 observation_space.shape
         obs_shape = env.observation_space.shape
         self.model = torch.nn.Sequential(
             torch.nn.Flatten(),
@@ -46,7 +46,7 @@ class DQNAgent(BaseAgent):
             device=device
         )
         
-        # 4. 实例化 Collector (天授式核心)
+        # 4. 实例化 Collector
         self.collector = Collector(policy=self.algorithm, env=env, buffer=buffer)
         
         # 5. 实例化训练器
@@ -67,20 +67,18 @@ class DQNAgent(BaseAgent):
         """
         实现 BaseAgent 的 act 接口。
         """
-        # epsilon-greedy 探索
-        if np.random.rand() < epsilon:
-            return np.random.randint(self.action_dim)
+        # 设置探索率
+        self.algorithm.policy.set_eps(epsilon)
         
-        # 正常推理
+        # 正常推理 (探索逻辑在 Policy 内部处理)
         batch = Batch(obs=np.array([state]))
-        result = self.policy(batch)
+        result = self.algorithm(batch)
         return result.act.item()
 
     def record(self, state, action, reward, next_state, done):
         """
         如果需要手动记录数据到 Buffer
         """
-        # 强制契约：collector 必须有 buffer
         self.collector.buffer.add(state, action, reward, done)
 
     def save(self, path=None):
@@ -91,10 +89,10 @@ class DQNAgent(BaseAgent):
         self.algorithm.sync_target()
 
     def train(self):
-        self.policy.model.train()
+        self.algorithm.policy.train()
 
     def eval(self):
-        self.policy.model.eval()
+        self.algorithm.policy.eval()
 
     @property
     def optimize_count(self):
