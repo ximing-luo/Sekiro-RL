@@ -49,7 +49,7 @@ python src/framework/examples/cartpole/train_cartpole.py --num-envs 1024 --steps
 ## 推理（可视化）
 
 ```bash
-python src/framework/examples/cartpole/play_cartpole.py --model logs\cartpole\cartpole_dqn_20260429_235248\model.pth
+python src/framework/examples/cartpole/play_cartpole.py --model logs/cartpole\cartpole_dqn_20260430_005706\model.pth
 ```
 
 **参数：**

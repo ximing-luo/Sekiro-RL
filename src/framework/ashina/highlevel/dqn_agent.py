@@ -1,12 +1,11 @@
 import torch
 import numpy as np
+from typing import Optional
 from dataclasses import dataclass
-from typing import Any, Optional
 from .base import BaseAgent
 from ..algorithm.modelfree import DQNAlgorithm
 from ..trainer import OffPolicyTrainer
-from ..data.batch import Batch
-from ..data.collector import Collector
+from ..data import Batch, Collector, ReplayBuffer
 from ..env import VectorEnv
 
 
@@ -19,6 +18,8 @@ class DQNConfig:
     epsilon_end: float = 0.01
     epsilon_decay: float = 0.995
     batch_size: int = 2048
+    steps_per_iter: int = 24
+    epochs: int = 4
 
 
 class DQNAgent(BaseAgent):
@@ -28,9 +29,9 @@ class DQNAgent(BaseAgent):
     """
     def __init__(
         self,
-        vec_env: VectorEnv,
+        env: VectorEnv,
         action_dim: int,
-        buffer: Any,
+        buffer: ReplayBuffer,
         params: DQNConfig = None,
         model: Optional[torch.nn.Module] = None,
         model_file: Optional[str] = None,
@@ -41,7 +42,7 @@ class DQNAgent(BaseAgent):
         self.model_file = model_file
         p = params or DQNConfig()
 
-        obs_batch, _ = vec_env.reset()
+        obs_batch, _ = env.reset()
         input_dim = int(np.prod(obs_batch[0].shape))
 
         self.algorithm = DQNAlgorithm(
@@ -57,11 +58,11 @@ class DQNAgent(BaseAgent):
             epsilon_decay=p.epsilon_decay,
         )
 
-        self.vec_env = vec_env
+        self.env = env
 
         self.collector = Collector(
             algorithm=self.algorithm,
-            vec_env=self.vec_env,
+            env=self.env,
             buffer=buffer
         )
 
@@ -69,14 +70,16 @@ class DQNAgent(BaseAgent):
             algorithm=self.algorithm,
             train_collector=self.collector,
             batch_size=p.batch_size,
+            steps_per_iter=p.steps_per_iter,
+            epochs=p.epochs,
         )
 
     def act(self, state):
         """单个 state 推理（用于评估）"""
         return self.algorithm(Batch(obs=np.array([state]))).act.item()
 
-    def learn(self, steps_per_iter: int = 24, learn_epochs: int = 4):
-        return self.trainer.train_iteration(steps_per_iter, learn_epochs)
+    def learn(self):
+        return self.trainer.train_iteration()
 
     def train(self):
         """切换到训练模式"""
@@ -104,4 +107,4 @@ class DQNAgent(BaseAgent):
 
     def close(self):
         """关闭环境"""
-        self.vec_env.close()
+        self.env.close()

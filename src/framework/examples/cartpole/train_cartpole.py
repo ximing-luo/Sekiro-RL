@@ -19,7 +19,7 @@ from src.framework.ashina.algorithm.net.discrete import QNetwork
 from src.framework.ashina.data.buffer import ReplayBuffer
 from src.framework.ashina.data.collector import Collector
 from src.framework.ashina.trainer.offpolicy import OffPolicyTrainer
-from src.framework.ashina.env.gymnasium_wrapper import GymnasiumWrapper
+from src.framework.ashina.env.wrapper import GymnasiumWrapper
 
 
 def make_log_dir(base: str) -> str:
@@ -35,7 +35,7 @@ def run_highlevel(args):
     vec_env = GymnasiumWrapper(gym.vector.SyncVectorEnv(env_fns))
 
     agent = DQNAgent(
-        vec_env=vec_env,
+        env=vec_env,
         action_dim=2,
         buffer=ReplayBuffer(size=args.buffer_size),
         params=DQNConfig(
@@ -46,6 +46,8 @@ def run_highlevel(args):
             epsilon_end=0.05,
             epsilon_decay=0.995,
             batch_size=args.batch_size,
+            steps_per_iter=args.steps_per_iter,
+            epochs=args.learn_epochs,
         ),
     )
 
@@ -53,14 +55,14 @@ def run_highlevel(args):
     agent.collector.collect_random_steps(args.warmup)
 
     for it in range(args.num_iterations):
-        result = agent.learn(steps_per_iter=args.steps_per_iter, learn_epochs=args.learn_epochs)
+        result = agent.learn()
 
         if it % 10 == 0:
-            rew = result.get("rew", 0.0)
-            bpe = result.get("batches_per_epoch", 0)
-            epochs = result.get("epochs", 0)
-            total_updates = bpe * epochs
-            print(f"Iter {it:4d} | rew: {rew:.2f} | updates: {total_updates} ({bpe}×{epochs})")
+            reward = result["reward"]
+            loss = result["loss"]
+            td_errors = float(np.mean(result["td_errors"]))
+            q_avg = result["q_avg"]
+            print(f"Iter {it:4d} | reward: {reward:.2f} | loss: {loss:.4f} | td_errors: {td_errors:.4f} | q_avg: {q_avg:.4f}")
 
     vec_env.close()
 
@@ -87,20 +89,20 @@ def run_lowlevel(args):
     )
     buffer = ReplayBuffer(size=args.buffer_size)
     collector = Collector(algo, vec_env, buffer)
-    trainer = OffPolicyTrainer(algo, collector, batch_size=args.batch_size)
+    trainer = OffPolicyTrainer(algo, collector, batch_size=args.batch_size, steps_per_iter=args.steps_per_iter, epochs=args.learn_epochs)
 
     print(f"Warmup: filling buffer with {args.warmup} steps...")
     trainer.train_collector.collect_random_steps(args.warmup)
 
     for it in range(args.num_iterations):
-        result = trainer.train_iteration(steps_per_iter=args.steps_per_iter, learn_epochs=args.learn_epochs)
+        result = trainer.train_iteration()
 
         if it % 10 == 0:
-            rew = result.get("rew", 0.0)
-            bpe = result.get("batches_per_epoch", 0)
-            epochs = result.get("epochs", 0)
-            total_updates = bpe * epochs
-            print(f"Iter {it:4d} | rew: {rew:.2f} | updates: {total_updates} ({bpe}×{epochs})")
+            reward = result["reward"]
+            loss = result["loss"]
+            td_errors = float(np.mean(result["td_errors"]))
+            q_avg = result["q_avg"]
+            print(f"Iter {it:4d} | reward: {reward:.2f} | loss: {loss:.4f} | td_errors: {td_errors:.4f} | q_avg: {q_avg:.4f}")
 
     vec_env.close()
 
