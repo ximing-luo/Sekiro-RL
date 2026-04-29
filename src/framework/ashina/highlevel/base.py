@@ -14,13 +14,9 @@ class BaseAgent(ABC):
         # 移除可能引起冲突的属性初始化，由具体子类或算法类管理
 
     @abstractmethod
-    def act(self, state, epsilon=0.0):
-        """
-        根据当前状态选择动作。
-        """
+    def act(self, state):
         pass
 
-    @abstractmethod
     def record(self, state, action, reward, next_state, done):
         """
         将经验存入缓冲区（可选，有些算法可能由 Runner 负责）。

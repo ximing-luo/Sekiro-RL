@@ -1,3 +1,4 @@
-from .venvs import BaseVectorEnv, DummyVectorEnv
+from .venvs import VectorEnv
+from .gymnasium_wrapper import GymnasiumWrapper
 
-__all__ = ["BaseVectorEnv", "DummyVectorEnv"]
+__all__ = ["VectorEnv", "GymnasiumWrapper"]

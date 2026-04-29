@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 class Batch:
     """
@@ -15,29 +15,19 @@ class Batch:
         return Batch(**{k: v[index] for k, v in self.__dict__.items()})
 
     def __len__(self) -> int:
-        """返回 Batch 大小：显式迭代"""
-        for v in self.__dict__.values():
-            return len(v)
-        return 0
+        first = next(iter(self.__dict__.values()), None)
+        return len(first) if first is not None else 0
 
     def to_torch(self, device: Optional[torch.device] = None) -> 'Batch':
-        """确定性转换：利用 torch.as_tensor 自动分发"""
         for k, v in self.__dict__.items():
-            # 自动处理 numpy 和 tensor
             t = torch.as_tensor(v, device=device)
-            # 强行收敛浮点精度
             if t.dtype == torch.float64:
                 t = t.to(torch.float32)
             self.__dict__[k] = t
         return self
 
     def __getattr__(self, key: str) -> Any:
-        """
-        属性访问保护。
-        如果属性不存在，返回 None 而不是抛出异常，
-        这在处理某些算法可选的 Batch 键（如 weights, info）时非常优雅。
-        """
-        return self.__dict__.get(key, None)
+        return object.__getattribute__(self, '__dict__').get(key, None)
 
     def __contains__(self, key: str) -> bool:
         return key in self.__dict__
@@ -50,6 +40,22 @@ class Batch:
 
     def items(self):
         return self.__dict__.items()
+
+    @staticmethod
+    def cat(batches: list) -> 'Batch':
+        """合并多个 Batch 为一个大 Batch（沿第 0 维拼接）"""
+        if not batches:
+            return Batch()
+        merged = {}
+        for key in batches[0].__dict__:
+            values = [b.__dict__[key] for b in batches]
+            if isinstance(values[0], torch.Tensor):
+                merged[key] = torch.cat(values, dim=0)
+            elif isinstance(values[0], np.ndarray):
+                merged[key] = np.concatenate(values, axis=0)
+            else:
+                merged[key] = values[0]
+        return Batch(**merged)
 
     def __repr__(self) -> str:
         s = "Batch(\n"

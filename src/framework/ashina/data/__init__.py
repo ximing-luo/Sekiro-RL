@@ -1,4 +1,4 @@
-from .base import BaseBuffer
-from .replay_buffer import ReplayBuffer
+from .buffer import ReplayBuffer
+from .collector import Collector
 
-__all__ = ["BaseBuffer", "ReplayBuffer"]
+__all__ = ["ReplayBuffer", "Collector"]

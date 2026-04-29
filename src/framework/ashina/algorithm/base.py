@@ -13,16 +13,6 @@ class Policy(nn.Module, ABC):
         super().__init__()
         self.action_dim = action_dim
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
-        self.training = True  # 记录当前模式
-
-    def train(self, mode: bool = True):
-        """设置训练/评估模式。"""
-        self.training = mode
-        super().train(mode)
-
-    def eval(self):
-        """设置评估模式。"""
-        self.train(False)
 
     @abstractmethod
     def forward(
@@ -64,6 +54,11 @@ class Algorithm(ABC):
         """
         return self.learn(batch, **kwargs)
 
+    def pre_collect(self, step: int) -> None:
+        pass
+
+    def sync_target(self) -> None:
+        pass
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """代理调用 policy 的 forward"""
         return self.policy(*args, **kwargs)

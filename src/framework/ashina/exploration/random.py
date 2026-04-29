@@ -53,25 +53,18 @@ class OUNoise(BaseNoise):
         self._x: Optional[Union[float, np.ndarray]] = None
         self.reset()
 
-    def reset(self) -> None:
+    def reset(self, size: Optional[Sequence[int]] = None) -> None:
         """重置状态。通常在每个 episode 开始时调用。"""
-        self._x = self._x0
+        if size is None:
+            self._x = self._x0
+        else:
+            self._x = np.zeros(size) if self._x0 is None else np.full(size, float(self._x0))
 
     def __call__(self, size: Sequence[int], mu: Optional[float] = None) -> np.ndarray:
-        """生成 OU 噪声。"""
-        # 移除 isinstance 探测，使用类型安全的重置逻辑
-        # 物理化：如果 _x 未被初始化，或者维度不匹配，则重置为标量 0.0，利用 numpy 的广播机制
         if self._x is None:
-            self._x = 0.0
-        else:
-            # 安全地检查维度
-            shape = np.shape(self._x)
-            if shape and shape != tuple(size):
-                self._x = 0.0
-
+            self._x = np.zeros(size)
         if mu is None:
             mu = self._mu
-            
         r = self._beta * np.random.normal(size=size)
         self._x = self._x + self._alpha * (mu - self._x) + r
         return self._x  # type: ignore
